@@ -46,8 +46,9 @@ def test():
     pass
 
 def main():
-    train_data = get_data('./cars_train')
-    test_data = get_data('./cars_test')
+    train_data = get_data('./cars_train', resize=True)
+    print('train data returned')
+    test_data = get_data('./cars_test', resize=True)
 
     print(train_data.shape)
     print(test_data.shape)

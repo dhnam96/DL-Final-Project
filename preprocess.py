@@ -3,7 +3,7 @@ import tensorflow as tf
 import cv2, os, shutil, glob 
 from tensorflow.keras.preprocessing import image
 
-NUM_DATA = 8100
+NUM_DATA = 8000
 
 def crop_center(image, target_size):
     h, w = image.shape[-3], image.shape[-2]
@@ -22,8 +22,8 @@ def get_data(dir_path, resize=False):
             img = crop_center(img, target_size)
             save_path = os.path.join(os.path.dirname(file_path), 'preprocessed', os.path.basename(file_path))
             image.save_img(save_path, img)
-        if index % 1000 == 0:
-            print("Preprocessing %3.3f" %(index/NUM_DATA*100))
+        if index % 100 == 0:
+            print("Preprocessing %3.3f percent completed" %(index/NUM_DATA*100))
         return img
 
     file_path = dir_path + '/*.jpg'
@@ -35,7 +35,10 @@ def get_data(dir_path, resize=False):
             shutil.rmtree(preprocess_dir)
         os.mkdir(os.path.join(dir_path, 'preprocessed'))
 
-    index = 1
-    dataset= np.array([load_and_process_image(img, index=index) for img in dataset])
-
-    return dataset
+    data = []
+    for (index, img) in enumerate(dataset):
+        img_data = load_and_process_image(img, index)
+        data.append(img_data)    
+    
+    data = tf.convert_to_tensor(data)
+    return data
