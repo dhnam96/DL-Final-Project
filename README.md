@@ -19,8 +19,10 @@ Pyramid Context Encoder Network:
 -	Tl;dr : faster network training and more realistic results. Superior performance and faster computation.
 
 We need to generate content that is both visually-realistic and semantically reasonable. 
+
 Approach 1 – texture synthesis techniques to fill regions at image level
-	Drawback: lack of high-level understanding of an image often results in failures in generating semantically-reasonable results
+	Drawback: lack of high-level understanding of an image often results in failures in generating semantically-reasonable results.
+	
 Approach 2 – encode semantic context of an image into a latent feature space by deep neural networks and then generate a semantic-coherent patches by generative models.
 
 Paper’s approach – generate visual and semantic coherence by filling regions at both image and feature levels. U-Net structure (encode context from low-level pixels to high-level semantic features and decode the features back into image)
