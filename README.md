@@ -33,3 +33,5 @@ Takes input the reconstructed features from ATNs through skip connections and th
 
 Note:
 Cross-layer attention transfer
+
+https://github.com/affinelayer/pix2pix-tensorflow
