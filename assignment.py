@@ -41,13 +41,13 @@ class Discriminator_Model(tf.keras.Model):
         return tf.reduce_mean(-(tf.log(predict_real) + tf.log(1-predict_fake)))
 
 def train():
-
+    pass
 def test():
-
+    pass
 
 def main():
-    train_data = get_data('./stanford-cars-dataset/cars_train')
-    test_data = get_data('./stanford-cars-dataset/cars_test')
+    train_data = get_data('./cars_train')
+    test_data = get_data('./cars_test')
 
     print(train_data.shape)
     print(test_data.shape)
