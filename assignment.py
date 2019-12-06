@@ -8,6 +8,48 @@ class Generator_Model(tf.keras.Model):
     def __init__(self):
         super(Generator_Model, self).__init__()
 
+        # Encoder Layers:
+        self.conv1 = tf.keras.layers.Conv2d(filters = 5, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02))
+        self.batch_norm1 = tf.keras.layers.BatchNormalization(epsilon = 1e-5)
+        self.leaky1 = tf.keras.layers.LeakyReLU(alpha = 0.2)
+        self.conv2 = tf.keras.layers.Conv2d(filters = 10, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02))
+        self.batch_norm2 = tf.keras.layers.BatchNormalization(epsilon = 1e-5)
+        self.leaky2 = tf.keras.layers.LeakyReLU(alpha = 0.2)
+        self.conv3 = tf.keras.layers.Conv2d(filters = 20, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02))
+        self.batch_norm3 = tf.keras.layers.BatchNormalization(epsilon = 1e-5)
+        self.leaky3 = tf.keras.layers.LeakyReLU(alpha = 0.2)
+        self.conv4 = tf.keras.layers.Conv2d(filters = 40, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02))
+        self.batch_norm4 = tf.keras.layers.BatchNormalization(epsilon = 1e-5)
+        self.leaky4 = tf.keras.layers.LeakyReLU(alpha = 0.2)
+        self.flatten = tf.keras.layers.Flatten()
+        # self.dense1 = tf.keras.layers.Dense(512)
+        self.dense2 = tf.keras.layers.Dense(512, activation="tanh")
+
+        # Decoder Layers:
+
+
+    def encoder(batch_img):
+        l1 = self.conv1(batch_img)
+        l2 = self.batch_norm1(l1)
+        l3 = self.leaky1(l2)
+        l4 = self.conv2(l3)
+        l5 = self.batch_norm2(l4)
+        l6 = self.leaky2(l5)
+        l7 = self.conv3(l6)
+        l8 = self.batch_norm3(l7)
+        l9 = self.leaky3(l8)
+        l10 = self.conv4(l9)
+        l11 = self.batch_norm4(l10)
+        l12 = self.leaky4(l11)
+        flattened = self.flatten(l12)
+        # mean = self.dense1(flattened)
+        logsigma = self.dense2(flattened)
+        return logsigma
+
+    def decoder(encoder_output):
+
+
+
 class Discriminator_Model(tf.keras.Model):
     def __init__(self):
         super(Discriminator_Model, self).__init__()
@@ -15,11 +57,11 @@ class Discriminator_Model(tf.keras.Model):
         # Kernel size
         self.kernel_size = 64
         # Layers
-        self.conv1 = tf.keras.Layers.Conv2d(filters = 5, kernel_size= self.kernel_size, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02), activation="relu")
-        self.conv2 = tf.keras.Layers.Conv2d(filters = 5, kernel_size= 4*self.kernel_size, strides=[1, 1], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02))
-        self.conv3 = tf.keras.Layers.Conv2d(filters = 5, kernel_size= 8*self.kernel_size, strides=[1, 1], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02))
-        self.conv4 = tf.keras.Layers.Conv2d(filters = 5, kernel_size= 8*self.kernel_size, strides=[1, 1], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02))
-        self.conv5 = tf.keras.Layers.Conv2d(filters = 5, kernel_size= 1, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02), activation="sigmoid")
+        self.conv1 = tf.keras.layers.Conv2d(filters = 5, kernel_size = self.kernel_size, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02), activation="relu")
+        self.conv2 = tf.keras.layers.Conv2d(filters = 5, kernel_size = 4*self.kernel_size, strides=[1, 1], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02))
+        self.conv3 = tf.keras.layers.Conv2d(filters = 5, kernel_size = 8*self.kernel_size, strides=[1, 1], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02))
+        self.conv4 = tf.keras.layers.Conv2d(filters = 5, kernel_size = 8*self.kernel_size, strides=[1, 1], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02))
+        self.conv5 = tf.keras.layers.Conv2d(filters = 5, kernel_size = 1, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02), activation="sigmoid")
         # Optimizer
         self.optimizer = tf.keras.optimizers.Adam(lr = 2e-4, beta_1 = 0.5)
 
@@ -41,13 +83,15 @@ class Discriminator_Model(tf.keras.Model):
         return tf.reduce_mean(-(tf.log(predict_real) + tf.log(1-predict_fake)))
 
 def train():
+
     pass
+
 def test():
+
     pass
 
 def main():
     train_data = get_data('./cars_train', resize=True)
-    print('train data returned')
     test_data = get_data('./cars_test', resize=True)
 
     print(train_data.shape)
