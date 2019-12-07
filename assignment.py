@@ -4,8 +4,12 @@ import numpy as np
 import tensorflow as tf
 from preprocess import get_data
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
+
 class Generator_Model(tf.keras.Model):
     def __init__(self):
+        
         super(Generator_Model, self).__init__()
 
 class Discriminator_Model(tf.keras.Model):
@@ -46,12 +50,8 @@ def test():
     pass
 
 def main():
-    train_data = get_data('./cars_train', resize=True)
-    print('train data returned')
-    test_data = get_data('./cars_test', resize=True)
-
-    print(train_data.shape)
-    print(test_data.shape)
-
+    train_data = get_data('./cars_train/preprocessed', resize=False)
+    test_data = get_data('./cars_test/preprocessed', resize=False)
+    
 if __name__ == '__main__':
    main()

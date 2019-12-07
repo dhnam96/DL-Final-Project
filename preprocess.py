@@ -23,7 +23,7 @@ def get_data(dir_path, resize=False):
             save_path = os.path.join(os.path.dirname(file_path), 'preprocessed', os.path.basename(file_path))
             image.save_img(save_path, img)
         if index % 100 == 0:
-            print("Preprocessing %3.3f percent completed" %(index/NUM_DATA*100))
+            print("Preprocessing %3.2f percent completed" %(index/NUM_DATA*100))
         return img
 
     file_path = dir_path + '/*.jpg'
@@ -40,5 +40,4 @@ def get_data(dir_path, resize=False):
         img_data = load_and_process_image(img, index)
         data.append(img_data)    
     
-    data = tf.convert_to_tensor(data)
     return data
