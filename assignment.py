@@ -151,7 +151,8 @@ def test():
     pass
 
 def crop_img(images, x, y):
-    images[:, y:, x:, :] = 0.0
+    images_copy = np.copy(images)
+    images_copy[:, y:, x:, :] = 0.0
     return images
 
 
