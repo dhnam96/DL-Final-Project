@@ -2,6 +2,9 @@ import os
 import sys
 import numpy as np
 import tensorflow as tf
+from keras.models import Sequential
+from keras.layers import Dense, Activation, LeakyReLU, BatchNormalization, Conv2d, Flatten, Reshape, Conv2DTranspose
+from keras.optimizers import Adam
 from preprocess import get_data
 from imageio import imwrite
 import argparse
@@ -19,28 +22,69 @@ parser.add_argument('--img-height', type=int, default=256,
                     help='Height of images in pixels')
 args = parser.parse_args()
 
+def sample(m, logsigma):
+    eps = tf.random.normal(tf.shape(m), .0, 1.0)
+    return m + tf.math.exp(logsigma / 2) * eps
+
 class Generator_Model(tf.keras.Model):
     def __init__(self):
         super(Generator_Model, self).__init__()
 
         # Encoder Layers:
-        self.conv1 = tf.keras.layers.Conv2d(filters = 5, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02))
-        self.batch_norm1 = tf.keras.layers.BatchNormalization(epsilon = 1e-5)
-        self.leaky1 = tf.keras.layers.LeakyReLU(alpha = 0.2)
-        self.conv2 = tf.keras.layers.Conv2d(filters = 10, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02))
-        self.batch_norm2 = tf.keras.layers.BatchNormalization(epsilon = 1e-5)
-        self.leaky2 = tf.keras.layers.LeakyReLU(alpha = 0.2)
-        self.conv3 = tf.keras.layers.Conv2d(filters = 20, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02))
-        self.batch_norm3 = tf.keras.layers.BatchNormalization(epsilon = 1e-5)
-        self.leaky3 = tf.keras.layers.LeakyReLU(alpha = 0.2)
-        self.conv4 = tf.keras.layers.Conv2d(filters = 40, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02))
-        self.batch_norm4 = tf.keras.layers.BatchNormalization(epsilon = 1e-5)
-        self.leaky4 = tf.keras.layers.LeakyReLU(alpha = 0.2)
-        self.flatten = tf.keras.layers.Flatten()
-        # self.dense1 = tf.keras.layers.Dense(512)
-        self.dense2 = tf.keras.layers.Dense(512, activation="tanh")
+        # self.conv1 = tf.keras.layers.Conv2d(filters = 5, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02))
+        # self.batch_norm1 = tf.keras.layers.BatchNormalization(epsilon = 1e-5)
+        # self.leaky1 = tf.keras.layers.LeakyReLU(alpha = 0.2)
+        # self.conv2 = tf.keras.layers.Conv2d(filters = 10, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02))
+        # self.batch_norm2 = tf.keras.layers.BatchNormalization(epsilon = 1e-5)
+        # self.leaky2 = tf.keras.layers.LeakyReLU(alpha = 0.2)
+        # self.conv3 = tf.keras.layers.Conv2d(filters = 20, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02))
+        # self.batch_norm3 = tf.keras.layers.BatchNormalization(epsilon = 1e-5)
+        # self.leaky3 = tf.keras.layers.LeakyReLU(alpha = 0.2)
+        # self.conv4 = tf.keras.layers.Conv2d(filters = 40, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02))
+        # self.batch_norm4 = tf.keras.layers.BatchNormalization(epsilon = 1e-5)
+        # self.leaky4 = tf.keras.layers.LeakyReLU(alpha = 0.2)
+        # self.flatten = tf.keras.layers.Flatten()
+        # self.mean = tf.keras.layers.Dense(512)
+        # self.logsigma = tf.keras.layers.Dense(512, activation="tanh")
 
-        # Decoder Layers:
+        # Hyperparameters
+        self.filter_size = 5
+        self.channel = 3
+        self.optimizer = Adam(lr = 2e-4, beta_1 = 0.5)
+
+        # Sequential Encoder Layers
+        self.encoder_model = Sequential()
+        self.encoder_model.add(Conv2d(filters = self.filter_size, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.encoder_model.add(BatchNormalization(epsilon = 1e-5))
+        self.encoder_model.add(LeakyReLU(alpha = 0.2))
+        self.encoder_model.add(Conv2d(filters = 2*self.filter_size, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.encoder_model.add(BatchNormalization(epsilon = 1e-5))
+        self.encoder_model.add(LeakyReLU(alpha = 0.2))
+        self.encoder_model.add(Conv2d(filters = 4*self.filter_size, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.encoder_model.add(BatchNormalization(epsilon = 1e-5))
+        self.encoder_model.add(LeakyReLU(alpha = 0.2))
+        self.encoder_model.add(Conv2d(filters = 8*self.filter_size, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.encoder_model.add(BatchNormalization(epsilon = 1e-5))
+        self.encoder_model.add(LeakyReLU(alpha = 0.2))
+        self.encoder_model.add(Flatten())
+
+        # Sequential Decoder Layers:
+        self.decoder_model = Sequential()
+        self.decoder_model.add(Dense(8*self.filter_size*args.img_width*args.img_height))
+        self.decoder_model.add(Reshape((args.img_width, args.img_height, 8*filter_size)))
+        self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
+        self.decoder_model.add(Activation('relu'))
+        self.decoder_model.add(Conv2DTranspose(filter = 4*self.filter_size, kernel_size = 5, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
+        self.decoder_model.add(Activation('relu'))
+        self.decoder_model.add(Conv2DTranspose(filter = 2*self.filter_size, kernel_size = 5, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
+        self.decoder_model.add(Activation('relu'))
+        self.decoder_model.add(Conv2DTranspose(filter = self.filter_size, kernel_size = 5, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
+        self.decoder_model.add(Activation('relu'))
+        self.decoder_model.add(Conv2DTranspose(filter = self.channel, kernel_size = 5, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.decoder_model.add(Activation('tanh'))
 
 
     def encoder(batch_img):
@@ -57,8 +101,8 @@ class Generator_Model(tf.keras.Model):
         l11 = self.batch_norm4(l10)
         l12 = self.leaky4(l11)
         flattened = self.flatten(l12)
-        # mean = self.dense1(flattened)
-        logsigma = self.dense2(flattened)
+        mean = self.mean(flattened)
+        logsigma = self.logsigma(flattened)
         return logsigma
 
     def decoder(encoder_output):
