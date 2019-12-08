@@ -48,22 +48,23 @@ class Generator_Model(tf.keras.Model):
         # self.logsigma = tf.keras.layers.Dense(512, activation="tanh")
 
         # Hyperparameters
-        self.filter_size = 5
+        self.filter_size = 32
+        self.kernel_size = 5
         self.channel = 3
         self.optimizer = Adam(lr = 2e-4, beta_1 = 0.5)
 
         # Sequential Encoder Layers
         self.encoder_model = Sequential()
-        self.encoder_model.add(Conv2d(filters = self.filter_size, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.encoder_model.add(Conv2d(filters = self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.encoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.encoder_model.add(LeakyReLU(alpha = 0.2))
-        self.encoder_model.add(Conv2d(filters = 2*self.filter_size, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.encoder_model.add(Conv2d(filters = 2*self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.encoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.encoder_model.add(LeakyReLU(alpha = 0.2))
-        self.encoder_model.add(Conv2d(filters = 4*self.filter_size, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.encoder_model.add(Conv2d(filters = 4*self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.encoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.encoder_model.add(LeakyReLU(alpha = 0.2))
-        self.encoder_model.add(Conv2d(filters = 8*self.filter_size, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.encoder_model.add(Conv2d(filters = 8*self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.encoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.encoder_model.add(LeakyReLU(alpha = 0.2))
         self.encoder_model.add(Flatten())
@@ -74,36 +75,21 @@ class Generator_Model(tf.keras.Model):
         self.decoder_model.add(Reshape((args.img_width, args.img_height, 8*filter_size)))
         self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.decoder_model.add(Activation('relu'))
-        self.decoder_model.add(Conv2DTranspose(filter = 4*self.filter_size, kernel_size = 5, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.decoder_model.add(Conv2DTranspose(filter = 4*self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.decoder_model.add(Activation('relu'))
-        self.decoder_model.add(Conv2DTranspose(filter = 2*self.filter_size, kernel_size = 5, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.decoder_model.add(Conv2DTranspose(filter = 2*self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.decoder_model.add(Activation('relu'))
-        self.decoder_model.add(Conv2DTranspose(filter = self.filter_size, kernel_size = 5, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.decoder_model.add(Conv2DTranspose(filter = self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.decoder_model.add(Activation('relu'))
-        self.decoder_model.add(Conv2DTranspose(filter = self.channel, kernel_size = 5, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.decoder_model.add(Conv2DTranspose(filter = self.channel, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.decoder_model.add(Activation('tanh'))
 
 
     def encoder(batch_img):
-        l1 = self.conv1(batch_img)
-        l2 = self.batch_norm1(l1)
-        l3 = self.leaky1(l2)
-        l4 = self.conv2(l3)
-        l5 = self.batch_norm2(l4)
-        l6 = self.leaky2(l5)
-        l7 = self.conv3(l6)
-        l8 = self.batch_norm3(l7)
-        l9 = self.leaky3(l8)
-        l10 = self.conv4(l9)
-        l11 = self.batch_norm4(l10)
-        l12 = self.leaky4(l11)
-        flattened = self.flatten(l12)
-        mean = self.mean(flattened)
-        logsigma = self.logsigma(flattened)
-        return logsigma
+        pass
 
     def decoder(encoder_output):
         pass
@@ -114,16 +100,28 @@ class Discriminator_Model(tf.keras.Model):
     def __init__(self):
         super(Discriminator_Model, self).__init__()
 
-        # Kernel size
-        self.kernel_size = 64
+        # Hyperparameters
+        self.filter_size = 64
+        self.kernel_size = 5
+        self.channel = 1
+        self.optimizer = Adam(lr = 2e-4, beta_1 = 0.5)
+
         # Layers
-        self.conv1 = tf.keras.layers.Conv2d(filters = 5, kernel_size = self.kernel_size, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02), activation="relu")
-        self.conv2 = tf.keras.layers.Conv2d(filters = 5, kernel_size = 4*self.kernel_size, strides=[1, 1], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02))
-        self.conv3 = tf.keras.layers.Conv2d(filters = 5, kernel_size = 8*self.kernel_size, strides=[1, 1], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02))
-        self.conv4 = tf.keras.layers.Conv2d(filters = 5, kernel_size = 8*self.kernel_size, strides=[1, 1], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02))
-        self.conv5 = tf.keras.layers.Conv2d(filters = 5, kernel_size = 1, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02), activation="sigmoid")
-        # Optimizer
-        self.optimizer = tf.keras.optimizers.Adam(lr = 2e-4, beta_1 = 0.5)
+        # self.conv1 = tf.keras.layers.Conv2d(filters = 5, kernel_size = self.kernel_size, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02), activation="relu")
+        # self.conv2 = tf.keras.layers.Conv2d(filters = 5, kernel_size = 4*self.kernel_size, strides=[1, 1], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02))
+        # self.conv3 = tf.keras.layers.Conv2d(filters = 5, kernel_size = 8*self.kernel_size, strides=[1, 1], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02))
+        # self.conv4 = tf.keras.layers.Conv2d(filters = 5, kernel_size = 8*self.kernel_size, strides=[1, 1], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02))
+        # self.conv5 = tf.keras.layers.Conv2d(filters = 5, kernel_size = 1, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02), activation="sigmoid")
+
+        # Sequential Discriminator Model
+        self.discrim_model = Sequential()
+        self.discrim_model.add(Conv2d(filters = self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.discrim_model.add(Activation('relu'))
+        self.discrim_model.add(Conv2d(filters = 2*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.discrim_model.add(Conv2d(filters = 4*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.discrim_model.add(Conv2d(filters = 8*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.discrim_model.add(Conv2d(filters = self.channel, kernel_size = self.kernel_size, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.discrim_model.add(Activation('sigmoid'))
 
     def call(inputs):
         """
@@ -134,6 +132,10 @@ class Discriminator_Model(tf.keras.Model):
         third_out = self.conv3(second_out)
         fourth_out = self.conv4(third_out)
         output = self.conv5(fourth_out)
+        return output
+
+    def sequential_call(inputs):
+        output = self.discrim_model(inputs)
         return output
 
     def loss(discrim_real, discrim_fake):
