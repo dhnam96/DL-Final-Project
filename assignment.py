@@ -107,9 +107,7 @@ def test():
     pass
 
 def crop_img(images, x, y):
-    for i in range(0, args.batch_size):
-        img = images[i]
-        images[i] = img[x:][y:] = 0.0
+    images[:, y:, x:, :] = 0.0
     return images
 
 
