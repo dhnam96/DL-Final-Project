@@ -19,6 +19,10 @@ parser.add_argument('--img-height', type=int, default=256,
                     help='Height of images in pixels')
 args = parser.parse_args()
 
+def sample(m, logsigma):
+    eps = tf.random.normal(tf.shape(m), .0, 1.0)
+    return m + tf.math.exp(logsigma / 2) * eps
+
 class Generator_Model(tf.keras.Model):
     def __init__(self):
         super(Generator_Model, self).__init__()
@@ -107,7 +111,8 @@ def test():
     pass
 
 def crop_img(images, x, y):
-    images[:, y:, x:, :] = 0.0
+    images_copy = np.copy(images)
+    images_copy[:, y:, x:, :] = 0.0
     return images
 
 
