@@ -22,10 +22,6 @@ parser.add_argument('--img-height', type=int, default=256,
                     help='Height of images in pixels')
 args = parser.parse_args()
 
-def sample(m, logsigma):
-    eps = tf.random.normal(tf.shape(m), .0, 1.0)
-    return m + tf.math.exp(logsigma / 2) * eps
-
 class Generator_Model(tf.keras.Model):
     def __init__(self):
         super(Generator_Model, self).__init__()
@@ -52,6 +48,7 @@ class Generator_Model(tf.keras.Model):
         self.kernel_size = 5
         self.channel = 3
         self.optimizer = Adam(lr = 2e-4, beta_1 = 0.5)
+        self.dense_out = 512
 
         # Sequential Encoder Layers
         self.encoder_model = Sequential()
@@ -68,6 +65,10 @@ class Generator_Model(tf.keras.Model):
         self.encoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.encoder_model.add(LeakyReLU(alpha = 0.2))
         self.encoder_model.add(Flatten())
+
+        # Intermediate Layers:
+        self.mean = tf.keras.layers.Dense(self.dense_out)
+        self.logsigma = tf.keras.layers.Dense(self.dense_out, activation="tanh")
 
         # Sequential Decoder Layers:
         self.decoder_model = Sequential()
@@ -87,14 +88,19 @@ class Generator_Model(tf.keras.Model):
         self.decoder_model.add(Conv2DTranspose(filter = self.channel, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.decoder_model.add(Activation('tanh'))
 
+    def sample(m, logsigma):
+        eps = tf.random.normal(tf.shape(m), .0, 1.0)
+        return m + tf.math.exp(logsigma / 2) * eps
 
-    def encoder(batch_img):
-        pass
+    def kullback_leibler(self, m, logsigma):
+        return -tf.reduce_sum(logsigma - tf.math.pow(m, 2) - tf.math.exp(logsigma) + 1)/2
 
-    def decoder(encoder_output):
-        pass
-
-
+    def encode(self, inputs):
+        intermediate_output = self.encoder_model(inputs)
+        mean = self.mean(intermediate_output)
+        logsigma = self.logsigma(intermediate_output)
+        encoder_output = sample(mean, logsigma)
+        return mean, logsigma, encoder_output
 
 class Discriminator_Model(tf.keras.Model):
     def __init__(self):
@@ -144,7 +150,17 @@ class Discriminator_Model(tf.keras.Model):
         predict_real = tf.reduce_mean(bce(y_true = tf.ones_like(deiscrim_real), y_pred=discrim_real))
         return tf.reduce_mean(-(tf.log(predict_real) + tf.log(1-predict_fake)))
 
-def train():
+def train(generator, discriminator, train_data):
+    ### BATCH THIS
+    batched_train = train_data
+    ### DO PREPROCESS ON TRAIN LIKE SHUFFLE AND FLIP AND BATCH THEM
+    enc_mean, enc_logsigma, enc_Z = generator.encode(batched_train)
+    output = generator.decoder_model(enc_Z)
+    decoded_sample = generator.decoder_model(enc_mean + enc_logsigma)
+    discrim_fake = discriminator.discrim_model(output)
+    discrim_gen = discriminator.discrim_model(decoded_sample)
+    discrim_real = discriminator.discrim_model(batched_train)
+
 
     pass
 
