@@ -96,7 +96,9 @@ class Decoder(tf.keras.Model):
     def call(self, inputs):
         return self.decoder_model(inputs)
 
-    def loss_function(self, )
+    def loss_function(self, disc_fake_output, disc_tilde_output, layer_loss):
+        return self.fake_loss(tf.zeros_like(disc_fake_output), disc_fake_output) + \
+            self.tilde_loss(tf.zeros_like(disc_tilde_output), disc_tilde_output) - 1e-6 * layer_loss
 
 
 class Discriminator(tf.keras.Model):
