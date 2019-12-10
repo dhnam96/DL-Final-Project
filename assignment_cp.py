@@ -3,7 +3,7 @@ import sys
 import numpy as np
 import tensorflow as tf
 from keras.models import Sequential
-from keras.layers import Dense, Activation, LeakyReLU, BatchNormalization, Conv2d, Flatten, Reshape, Conv2DTranspose
+from keras.layers import Dense, Activation, LeakyReLU, BatchNormalization, Conv2D, Flatten, Reshape, Conv2DTranspose
 from keras.optimizers import Adam
 from keras.losses import BinaryCrossentropy
 from preprocess import get_data
@@ -11,6 +11,9 @@ from imageio import imwrite
 import argparse
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
+gpu_available = tf.test.is_gpu_available()
+print("GPU Available: ", gpu_available)
 
 parser = argparse.ArgumentParser(description='GAN')
 parser.add_argument('--batch-size', type=int, default=128,
@@ -30,11 +33,11 @@ parser.add_argument('--device', type=str, default='GPU:0' if gpu_available else 
 parser.add_argument('--mode', type=str, default='train',
                     help='Can be "train" or "test"')
 
-parser.add_argument('--out-dir', type=str, default='./output',
-                    help='Data where sampled output images will be written')
-
 parser.add_argument('--save-every', type=int, default=500,
                     help='Save the state of the network after every [this many] training iterations')
+
+parser.add_argument('--restore-checkpoint', action='store_true',
+                    help='Use this flag if you want to resuming training from a previously-saved checkpoint')
 args = parser.parse_args()
 
 def sample(m, logsigma):
@@ -62,16 +65,16 @@ class Encoder(tf.keras.Model):
 
         # Sequential Encoder Layers
         self.encoder_model = Sequential()
-        self.encoder_model.add(Conv2d(filters = filter_size, kernel_size = kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.encoder_model.add(Conv2D(filters = filter_size, kernel_size = kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.encoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.encoder_model.add(LeakyReLU(alpha = 0.2))
-        self.encoder_model.add(Conv2d(filters = 2*filter_size, kernel_size = kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.encoder_model.add(Conv2D(filters = 2*filter_size, kernel_size = kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.encoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.encoder_model.add(LeakyReLU(alpha = 0.2))
-        self.encoder_model.add(Conv2d(filters = 4*filter_size, kernel_size = kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.encoder_model.add(Conv2D(filters = 4*filter_size, kernel_size = kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.encoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.encoder_model.add(LeakyReLU(alpha = 0.2))
-        self.encoder_model.add(Conv2d(filters = 8*filter_size, kernel_size = kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.encoder_model.add(Conv2D(filters = 8*filter_size, kernel_size = kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.encoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.encoder_model.add(LeakyReLU(alpha = 0.2))
         self.encoder_model.add(Flatten())
@@ -109,16 +112,16 @@ class Decoder(tf.keras.Model):
         self.decoder_model.add(Reshape((args.img_width, args.img_height, 8*self.filter_size)))
         self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.decoder_model.add(Activation('relu'))
-        self.decoder_model.add(Conv2DTranspose(filter = 4*self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.decoder_model.add(Conv2DTranspose(filters = 4*self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.decoder_model.add(Activation('relu'))
-        self.decoder_model.add(Conv2DTranspose(filter = 2*self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.decoder_model.add(Conv2DTranspose(filters = 2*self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.decoder_model.add(Activation('relu'))
-        self.decoder_model.add(Conv2DTranspose(filter = self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.decoder_model.add(Conv2DTranspose(filters = self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.decoder_model.add(Activation('relu'))
-        self.decoder_model.add(Conv2DTranspose(filter = self.channel, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.decoder_model.add(Conv2DTranspose(filters = self.channel, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.decoder_model.add(Activation('tanh'))
 
         self.fake_loss = BinaryCrossentropy()
@@ -147,15 +150,15 @@ class Discriminator(tf.keras.Model):
 
         # Feature
         self.discrim_model = Sequential()
-        self.discrim_model.add(Conv2d(filters = 2*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.discrim_model.add(Conv2D(filters = 2*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.discrim_model.add(LeakyReLU(alpha = 0.2))
-        self.discrim_model.add(Conv2d(filters = 4*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.discrim_model.add(Conv2D(filters = 4*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.discrim_model.add(BatchNormalization(epsilon = 1e-5))
         self.discrim_model.add(LeakyReLU(alpha = 0.2))
-        self.discrim_model.add(Conv2d(filters = 8*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.discrim_model.add(Conv2D(filters = 8*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.discrim_model.add(BatchNormalization(epsilon = 1e-5))
         self.discrim_model.add(LeakyReLU(alpha = 0.2))
-        self.discrim_model.add(Conv2d(filters = 8*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.discrim_model.add(Conv2D(filters = 8*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
 
         # Additional Layers to pass through after the sequential model
         self.batch_norm = BatchNormalization(epsilon = 1e-5)
@@ -184,7 +187,7 @@ class Discriminator(tf.keras.Model):
 
 def train(encoder, decoder, discriminator, real_images, cropped):
     # here images should be a numpy array
-    for x in range(0, int(images.shape[0]/args.batch_size)):
+    for x in range(0, int(real_images.shape[0]/args.batch_size)):
         batch_real = real_images[x*args.batch_size: (x+1)*args.batch_size]
         batch_cropped = cropped[x*args.batch_size: (x+1)*args.batch_size]
 
@@ -209,7 +212,7 @@ def train(encoder, decoder, discriminator, real_images, cropped):
         discriminator.optimizer.apply_gradients(zip(disc_grads, discriminator.trainable_variables))
 
         if x % 10 == 0:
-            print("Training %3.3f percent complete" % (100*x/(images.shape[0]/args.batch_size)))
+            print("Training %3.3f percent complete" % (100*x/(real_images.shape[0]/args.batch_size)))
             print("Encoder Loss:")
             print(enc_loss)
             print("Decoder Loss:")
@@ -229,8 +232,8 @@ def crop_img(images, x, y):
 
 def main():
     # Get data
-    train_data = get_data('./cars_train/preprocessed', resize=False)
-    cropped = crop_img(np.array(train_data[:args.batch_size]), int(args.img_width/2), int(args.img_height/2))
+    train_data = np.array(get_data('./cars_train/preprocessed', resize=False))
+    cropped = crop_img(train_data[:args.batch_size], int(args.img_width/2), int(args.img_height/2))
 
     # Initialize model
     encoder = Encoder(32, 5, 512)
@@ -257,7 +260,7 @@ def main():
             if args.mode == 'train':
                 for epoch in range(0, args.num_epochs):
                     print('========================== EPOCH %d  ==========================' % epoch)
-                    train(generator, decoder, discriminator, train_data, cropped)
+                    train(encoder, decoder, discriminator, train_data, cropped)
                     # print("Average FID for Epoch: " + str(avg_fid))
                     # Save at the end of the epoch, too
                     print("**** SAVING CHECKPOINT AT END OF EPOCH ****")
