@@ -233,9 +233,9 @@ def main():
     cropped = crop_img(np.array(train_data[:args.batch_size]), int(args.img_width/2), int(args.img_height/2))
 
     # Initialize model
-    encoder = Encoder(_, )
-    decoder = Decoder(_, )
-    discriminator = Discriminator(_, )
+    encoder = Encoder(32, 5, 512)
+    decoder = Decoder(32, 5, 3)
+    discriminator = Discriminator(64, 5, 1)
 
     # For saving/loading models
     checkpoint_dir = './checkpoints'
@@ -249,7 +249,7 @@ def main():
 
     if args.restore_checkpoint or args.mode == 'test':
         # restores the latest checkpoint using from the manager
-        checkpoint.restore(manager.latest_checkpoint) 
+        checkpoint.restore(manager.latest_checkpoint)
 
     try:
         # Specify an invalid GPU device
@@ -257,7 +257,7 @@ def main():
             if args.mode == 'train':
                 for epoch in range(0, args.num_epochs):
                     print('========================== EPOCH %d  ==========================' % epoch)
-                    train(generator, decoder, discriminator, images)
+                    train(generator, decoder, discriminator, train_data, cropped)
                     # print("Average FID for Epoch: " + str(avg_fid))
                     # Save at the end of the epoch, too
                     print("**** SAVING CHECKPOINT AT END OF EPOCH ****")
