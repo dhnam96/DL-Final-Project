@@ -21,6 +21,20 @@ parser.add_argument('--img-width', type=int, default=256,
                     help='Width of images in pixels')
 parser.add_argument('--img-height', type=int, default=256,
                     help='Height of images in pixels')
+parser.add_argument('--num-epochs', type=int, default=10,
+                    help='Number of passes through the training data to make before stopping')
+
+parser.add_argument('--device', type=str, default='GPU:0' if gpu_available else 'CPU:0',
+                    help='specific the device of computation eg. CPU:0, GPU:0, GPU:1, GPU:2, ... ')
+
+parser.add_argument('--mode', type=str, default='train',
+                    help='Can be "train" or "test"')
+
+parser.add_argument('--out-dir', type=str, default='./output',
+                    help='Data where sampled output images will be written')
+
+parser.add_argument('--save-every', type=int, default=500,
+                    help='Save the state of the network after every [this many] training iterations')
 args = parser.parse_args()
 
 def sample(m, logsigma):
@@ -204,4 +218,54 @@ def train(encoder, decoder, discriminator, real_images, cropped):
             print(disc_loss)
 
 
+def test():
+    pass
 
+def crop_img(images, x, y):
+    images_copy = np.copy(images)
+    images_copy[:, y:, x:, :] = 0.0
+    return images
+
+
+def main():
+    # Get data
+    train_data = get_data('./cars_train/preprocessed', resize=False)
+    cropped = crop_img(np.array(train_data[:args.batch_size]), int(args.img_width/2), int(args.img_height/2))
+
+    # Initialize model
+    encoder = Encoder(_, )
+    decoder = Decoder(_, )
+    discriminator = Discriminator(_, )
+
+    # For saving/loading models
+    checkpoint_dir = './checkpoints'
+    checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
+    checkpoint = tf.train.Checkpoint(encoder=encoder, decoder=decoder, discriminator=discriminator)
+    manager = tf.train.CheckpointManager(checkpoint, checkpoint_dir, max_to_keep=3)
+
+    # Ensure the output directory exists
+    if not os.path.exists(args.out_dir):
+        os.makedirs(args.out_dir)
+
+    if args.restore_checkpoint or args.mode == 'test':
+        # restores the latest checkpoint using from the manager
+        checkpoint.restore(manager.latest_checkpoint) 
+
+    try:
+        # Specify an invalid GPU device
+        with tf.device('/device:' + args.device):
+            if args.mode == 'train':
+                for epoch in range(0, args.num_epochs):
+                    print('========================== EPOCH %d  ==========================' % epoch)
+                    train(generator, decoder, discriminator, images)
+                    # print("Average FID for Epoch: " + str(avg_fid))
+                    # Save at the end of the epoch, too
+                    print("**** SAVING CHECKPOINT AT END OF EPOCH ****")
+                    manager.save()
+            if args.mode == 'test':
+                test(encoder, decoder)
+    except RuntimeError as e:
+        print(e)
+
+if __name__ == '__main__':
+   main()
