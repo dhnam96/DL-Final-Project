@@ -92,6 +92,9 @@ class Decoder(tf.keras.Model):
         self.decoder_model.add(Conv2DTranspose(filter = channel, kernel_size = kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.decoder_model.add(Activation('tanh'))
 
+        self.fake_loss = BinaryCrossentropy()
+        self.tilde_loss = BinaryCrossentropy()
+
     @tf.function
     def call(self, inputs):
         return self.decoder_model(inputs)
