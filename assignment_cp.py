@@ -27,10 +27,10 @@ def sample(m, logsigma):
     eps = tf.random.normal(tf.shape(m), .0, 1.0)
     return m + tf.math.exp(logsigma / 2) * eps
 
-def kullback_leibler(m, logsigma):
+def kullback_leibler_loss(m, logsigma):
     return -tf.reduce_sum(logsigma - tf.math.pow(m, 2) - tf.math.exp(logsigma) + 1)/2
 
-def feature_loss(feature_real, feature_fake):
+def latent_layer_loss(feature_real, feature_fake):
     return -tf.reduce_mean(tf.reduce_sum(tf.square(feature_fake - feature_real), [1,2,3]))
 
 
