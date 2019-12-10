@@ -14,9 +14,8 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 gpu_available = tf.test.is_gpu_available()
 print("GPU Available: ", gpu_available)
-
 parser = argparse.ArgumentParser(description='GAN')
-parser.add_argument('--batch-size', type=int, default=64,
+parser.add_argument('--batch-size', type=int, default=128,
                     help='Sizes of image batches fed through the network')
 parser.add_argument('--out-dir', type=str, default='./output',
                     help='Data where sampled output images will be written')
@@ -26,18 +25,16 @@ parser.add_argument('--img-height', type=int, default=64,
                     help='Height of images in pixels')
 parser.add_argument('--num-epochs', type=int, default=10,
                     help='Number of passes through the training data to make before stopping')
-
 parser.add_argument('--device', type=str, default='GPU:0' if gpu_available else 'CPU:0',
                     help='specific the device of computation eg. CPU:0, GPU:0, GPU:1, GPU:2, ... ')
-
 parser.add_argument('--mode', type=str, default='train',
                     help='Can be "train" or "test"')
-
 parser.add_argument('--save-every', type=int, default=500,
                     help='Save the state of the network after every [this many] training iterations')
-
 parser.add_argument('--restore-checkpoint', action='store_true',
                     help='Use this flag if you want to resuming training from a previously-saved checkpoint')
+parser.add_argument('--num-gen-updates', type=int, default=2,
+                    help='Number of generator updates per discriminator update')
 args = parser.parse_args()
 
 def sample(m, logsigma):
@@ -226,8 +223,18 @@ def train(encoder, decoder, discriminator, real_images, cropped):
             print(disc_loss)
 
 
-def test():
-    pass
+def test(encoder, decoder, cropped):
+    ### BATCH CROP HERE
+    for x in range(0, int(cropped.shape[0]/args.batch_size/10)):
+        batch_cropped = cropped[x*args.batch_size: (x+1)*args.batch_size]
+        mean, logsigma, enc_out = encoder.call(batch_cropped)
+        dec_out = decoder.call(enc_out)
+        generated = dec_out * 255
+        output = generated.numpy().astype(np.uint8)
+        for i in range(0, args.batch_size):
+            image = output[i]
+            s = args.out_dir + '/' + str(i) + '.png'
+            imwrite(s, image)
 
 def crop_img(images, x, y):
     images_copy = np.copy(images)
@@ -238,8 +245,10 @@ def crop_img(images, x, y):
 def main():
     # Get data
     train_data = get_data('./cars_train/preprocessed', target_size=(args.img_width, args.img_height), resize=False)
-    print('Train is completed')
-    cropped = crop_img(train_data, int(args.img_width/2), int(args.img_height/2))
+    test_data = get_data('./cars_test/preprocessed', target_size=(args.img_width, args.img_height), resize=False)
+    print('Train and test data retrieved')
+    cropped_train = crop_img(train_data, int(2*args.img_width/3), int(2*args.img_height/2))
+    cropped_test = crop_img(test_data, int(2*args.img_width/3), int(2*args.img_height/3))
     print('Images are cropped')
 
     # Initialize model
@@ -267,13 +276,13 @@ def main():
             if args.mode == 'train':
                 for epoch in range(0, args.num_epochs):
                     print('========================== EPOCH %d  ==========================' % epoch)
-                    train(encoder, decoder, discriminator, train_data, cropped)
+                    train(encoder, decoder, discriminator, train_data, cropped_train)
                     # print("Average FID for Epoch: " + str(avg_fid))
                     # Save at the end of the epoch, too
                     print("**** SAVING CHECKPOINT AT END OF EPOCH ****")
                     manager.save()
             if args.mode == 'test':
-                test(encoder, decoder)
+                test(encoder, decoder, cropped_test)
     except RuntimeError as e:
         print(e)
 
