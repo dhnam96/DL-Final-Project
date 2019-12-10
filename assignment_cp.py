@@ -29,6 +29,10 @@ def sample(m, logsigma):
 def kullback_leibler(m, logsigma):
     return -tf.reduce_sum(logsigma - tf.math.pow(m, 2) - tf.math.exp(logsigma) + 1)/2
 
+def feature_loss(feature_real, feature_fake):
+    return -tf.reduce_mean(tf.reduce_sum(tf.square(feature_fake - feature_real), [1,2,3]))
+
+
 class Encoder(tf.keras.Model):
     def __init__(self, filter_size, kernel_size, channel, dense_out):
         super(Encoder, self).__init__()
