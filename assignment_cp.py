@@ -35,8 +35,13 @@ def latent_layer_loss(feature_real, feature_fake):
 
 
 class Encoder(tf.keras.Model):
-    def __init__(self, filter_size, kernel_size, channel, dense_out):
+    def __init__(self, filter_size, kernel_size, channel):
         super(Encoder, self).__init__()
+
+        # Variables
+        self.filter_size = filter_size
+        self.kernel_size = kernel_size
+        self.channel = channel
 
         # Sequential Encoder Layers
         self.encoder_model = Sequential()
@@ -55,8 +60,8 @@ class Encoder(tf.keras.Model):
         self.encoder_model.add(Flatten())
 
         # Intermediate Layers:
-        self.mean = Dense(dense_out)
-        self.logsigma = Dense(dense_out, activation="tanh")
+        self.mean = Dense(channel)
+        self.logsigma = Dense(channel, activation="tanh")
 
     @tf.function
     def call(self, inputs):
@@ -66,30 +71,35 @@ class Encoder(tf.keras.Model):
         encoder_output = sample(mean, logsigma)
         return mean, logsigma, encoder_output
 
-    def loss_function(self, _):
+    def loss_function(self, kl_loss, latent_loss):
         # TODO
-
+        return kl_loss/(self.channel*args.batch_size) - latent_loss
 
 class Decoder(tf.keras.Model):
-    def __init__(self, filter_size, kernel_size, channel, dense_out):
+    def __init__(self, filter_size, kernel_size, channel):
         super(Decoder, self).__init__()
+
+        # Variables
+        self.filter_size = filter_size
+        self.kernel_size = kernel_size
+        self.channel = channel
 
         # Sequential Decoder Layers:
         self.decoder_model = Sequential()
-        self.decoder_model.add(Dense(8*filter_size*args.img_width*args.img_height))
-        self.decoder_model.add(Reshape((args.img_width, args.img_height, 8*filter_size)))
+        self.decoder_model.add(Dense(8*self.filter_size*args.img_width*args.img_height))
+        self.decoder_model.add(Reshape((args.img_width, args.img_height, 8*self.filter_size)))
         self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.decoder_model.add(Activation('relu'))
-        self.decoder_model.add(Conv2DTranspose(filter = 4*filter_size, kernel_size = kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.decoder_model.add(Conv2DTranspose(filter = 4*self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.decoder_model.add(Activation('relu'))
-        self.decoder_model.add(Conv2DTranspose(filter = 2*filter_size, kernel_size = kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.decoder_model.add(Conv2DTranspose(filter = 2*self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.decoder_model.add(Activation('relu'))
-        self.decoder_model.add(Conv2DTranspose(filter = filter_size, kernel_size = kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.decoder_model.add(Conv2DTranspose(filter = self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.decoder_model.add(Activation('relu'))
-        self.decoder_model.add(Conv2DTranspose(filter = channel, kernel_size = kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.decoder_model.add(Conv2DTranspose(filter = self.channel, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.decoder_model.add(Activation('tanh'))
 
         self.fake_loss = BinaryCrossentropy()
@@ -99,23 +109,28 @@ class Decoder(tf.keras.Model):
     def call(self, inputs):
         return self.decoder_model(inputs)
 
-    def loss_function(self, disc_fake_output, disc_tilde_output, layer_loss):
+    def loss_function(self, disc_fake_output, disc_tilde_output, latent_loss):
         return self.fake_loss(tf.zeros_like(disc_fake_output), disc_fake_output) + \
-            self.tilde_loss(tf.zeros_like(disc_tilde_output), disc_tilde_output) - 1e-6 * layer_loss
+            self.tilde_loss(tf.zeros_like(disc_tilde_output), disc_tilde_output) - 1e-6 * latent_loss
 
 
 class Discriminator(tf.keras.Model):
     def __init__(self, filter_size, kernel_size, channel):
         super(Discriminator, self).__init__()
 
+        # Variables
+        self.filter_size = filter_size
+        self.kernel_size = kernel_size
+        self.channel = channel
+
         # Feature
         self.discrim_model = Sequential()
-        self.discrim_model.add(Conv2d(filters = 2*filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.discrim_model.add(Conv2d(filters = 2*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.discrim_model.add(LeakyReLU(alpha = 0.2))
-        self.discrim_model.add(Conv2d(filters = 4*filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.discrim_model.add(Conv2d(filters = 4*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.discrim_model.add(BatchNormalization(epsilon = 1e-5))
         self.discrim_model.add(LeakyReLU(alpha = 0.2))
-        self.discrim_model.add(Conv2d(filters = 8*filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.discrim_model.add(Conv2d(filters = 8*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.discrim_model.add(BatchNormalization(epsilon = 1e-5))
         self.discrim_model.add(LeakyReLU(alpha = 0.2))
         self.discrim_model.add(Conv2d(filters = 8*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
@@ -124,7 +139,7 @@ class Discriminator(tf.keras.Model):
         self.batch_norm = BatchNormalization(epsilon = 1e-5)
         self.leaky_relu = LeakyReLU(alpha = 0.2)
         self.flatten = Flatten()
-        self.dense = Dense(1, activation = 'sigmoid')
+        self.dense = Dense(self.channel, activation = 'sigmoid')
 
         # Define loss
         self.real_loss = BinaryCrossentropy()
