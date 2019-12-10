@@ -60,7 +60,7 @@ class Encoder(tf.keras.Model):
         logsigma = self.logsigma(intermediate_output)
         encoder_output = sample(mean, logsigma)
         return mean, logsigma, encoder_output
-    
+
     def loss_function(self, _):
         # TODO
 
@@ -86,11 +86,11 @@ class Decoder(tf.keras.Model):
         self.decoder_model.add(Activation('relu'))
         self.decoder_model.add(Conv2DTranspose(filter = channel, kernel_size = kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.decoder_model.add(Activation('tanh'))
-    
+
     @tf.function
     def call(self, inputs):
         return self.decoder_model(inputs)
-    
+
     def loss_function(self, )
 
 
@@ -98,8 +98,23 @@ class Discriminator(tf.keras.Model):
     def __init__(self, filter_size, kernel_size, channel):
         super(Discriminator, self).__init__()
 
-        # TODO
+        # Feature
+        self.discrim_model = Sequential()
+        self.discrim_model.add(Conv2d(filters = 2*filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.discrim_model.add(LeakyReLU(alpha = 0.2))
+        self.discrim_model.add(Conv2d(filters = 4*filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.discrim_model.add(BatchNormalization(epsilon = 1e-5))
+        self.discrim_model.add(LeakyReLU(alpha = 0.2))
+        self.discrim_model.add(Conv2d(filters = 8*filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.discrim_model.add(BatchNormalization(epsilon = 1e-5))
+        self.discrim_model.add(LeakyReLU(alpha = 0.2))
+        self.discrim_model.add(Conv2d(filters = 8*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
 
+        # Additional Layers to pass through after the sequential model
+        self.batch_norm = BatchNormalization(epsilon = 1e-5)
+        self.leaky_relu = LeakyReLU(alpha = 0.2)
+        self.flatten = Flatten()
+        self.dense = Dense(1, activation = 'sigmoid')
 
         # Define loss
         self.real_loss = tf.keras.losses.BinaryCrossentropy()
@@ -108,8 +123,11 @@ class Discriminator(tf.keras.Model):
 
     @tf.function
     def call(self, inputs):
-        # TODO
-
+        middle_conv = self.discrim_model(inputs)
+        output = self.batch_norm(features)
+        output = self.leaky_relu(output)
+        output = self.flatten(output)
+        output = self.dense(output)
         return middle_conv, output
 
     def loss_function(self, disc_real_output, disc_fake_output, disc_tilde_output):
