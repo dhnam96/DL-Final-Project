@@ -14,8 +14,7 @@ def crop_center(image, target_size):
     return tf.image.resize(cropped_image, target_size)
 
 
-def get_data(dir_path, resize=False):
-    target_size = (64, 64)
+def get_data(dir_path, target_size, resize=False):
     def load_and_process_image(file_path, index, target_size = (64, 64)):
         img = image.load_img(file_path)
         img = image.img_to_array(img)

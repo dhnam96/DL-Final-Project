@@ -233,7 +233,7 @@ def crop_img(images, x, y):
 
 def main():
     # Get data
-    train_data = get_data('./cars_train/preprocessed', resize=False)
+    train_data = get_data('./cars_train/preprocessed', target_size=(args.img_width, args.img_height), resize=False)
     print('Train is completed')
     cropped = crop_img(train_data, int(args.img_width/2), int(args.img_height/2))
     print('Images are cropped')
