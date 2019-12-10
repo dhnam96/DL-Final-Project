@@ -15,7 +15,7 @@ def crop_center(image, target_size):
 
 
 def get_data(dir_path, resize=False):
-    def load_and_process_image(file_path, index, target_size = (256, 256)):
+    def load_and_process_image(file_path, index, target_size = (64, 64)):
         img = image.load_img(file_path)
         img = image.img_to_array(img)
         if resize:
@@ -35,7 +35,7 @@ def get_data(dir_path, resize=False):
             shutil.rmtree(preprocess_dir)
         os.mkdir(os.path.join(dir_path, 'preprocessed'))
 
-    data = np.zeros(shape=(len(dataset), 256, 256, 3), dtype=np.float32)
+    data = np.zeros(shape=(len(dataset), 64, 64, 3), dtype=np.float32)
     for (index, img) in enumerate(dataset):
         img_data = load_and_process_image(img, index)
         data[index] = img_data    

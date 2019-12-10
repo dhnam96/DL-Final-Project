@@ -2,10 +2,10 @@ import os
 import sys
 import numpy as np
 import tensorflow as tf
-from keras.models import Sequential
-from keras.layers import Dense, Activation, LeakyReLU, BatchNormalization, Conv2D, Flatten, Reshape, Conv2DTranspose
-from keras.optimizers import Adam
-from keras.losses import BinaryCrossentropy
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Activation, LeakyReLU, BatchNormalization, Conv2D, Flatten, Reshape, Conv2DTranspose
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.losses import BinaryCrossentropy
 from preprocess import get_data
 from imageio import imwrite
 import argparse
@@ -16,13 +16,13 @@ gpu_available = tf.test.is_gpu_available()
 print("GPU Available: ", gpu_available)
 
 parser = argparse.ArgumentParser(description='GAN')
-parser.add_argument('--batch-size', type=int, default=128,
+parser.add_argument('--batch-size', type=int, default=24,
                     help='Sizes of image batches fed through the network')
 parser.add_argument('--out-dir', type=str, default='./output',
                     help='Data where sampled output images will be written')
-parser.add_argument('--img-width', type=int, default=256,
+parser.add_argument('--img-width', type=int, default=64,
                     help='Width of images in pixels')
-parser.add_argument('--img-height', type=int, default=256,
+parser.add_argument('--img-height', type=int, default=64,
                     help='Height of images in pixels')
 parser.add_argument('--num-epochs', type=int, default=10,
                     help='Number of passes through the training data to make before stopping')
@@ -174,7 +174,7 @@ class Discriminator(tf.keras.Model):
     @tf.function
     def call(self, inputs):
         middle_conv = self.discrim_model(inputs)
-        output = self.batch_norm(features)
+        output = self.batch_norm(middle_conv)
         output = self.leaky_relu(output)
         output = self.flatten(output)
         output = self.dense(output)
@@ -194,12 +194,17 @@ def train(encoder, decoder, discriminator, real_images, cropped):
         with tf.GradientTape() as enc_tape, tf.GradientTape() as dec_tape, tf.GradientTape() as disc_tape:
             print(batch_cropped.shape)
             mean, logsigma, enc_out = encoder.call(batch_cropped)
-            zp = tf.random_normal(shape=enc_out.shape)
+            print('encoder is done')
+            zp = tf.random.normal(shape=enc_out.shape)
+            print('prepare decoder')
             dec_out = decoder.call(enc_out)
+            print('first decoder is done')
             dec_noise = decoder.call(zp)
+            print('second decoder is done')
             feature_tilde, disc_tilde_out = discriminator.call(dec_out)
             feature_real, disc_real_out = discriminator.call(batch_real)
             feature_fake, disc_fake_out = discriminator.call(dec_noise)
+            print('discriminators are done')
             kl_loss = kullback_leibler_loss(mean, logsigma)
             ll_loss = latent_layer_loss(feature_real, feature_tilde)
             enc_loss = encoder.loss(kl_loss, ll_loss)
