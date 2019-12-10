@@ -16,7 +16,7 @@ gpu_available = tf.test.is_gpu_available()
 print("GPU Available: ", gpu_available)
 
 parser = argparse.ArgumentParser(description='GAN')
-parser.add_argument('--batch-size', type=int, default=24,
+parser.add_argument('--batch-size', type=int, default=8,
                     help='Sizes of image batches fed through the network')
 parser.add_argument('--out-dir', type=str, default='./output',
                     help='Data where sampled output images will be written')
@@ -48,7 +48,7 @@ def kullback_leibler_loss(m, logsigma):
     return -tf.reduce_sum(logsigma - tf.math.pow(m, 2) - tf.math.exp(logsigma) + 1)/2
 
 def latent_layer_loss(feature_real, feature_tilde):
-    return -tf.reduce_mean(tf.reduce_sum(tf.square(feature_fake - feature_real), [1,2,3]))
+    return -tf.reduce_mean(tf.reduce_sum(tf.square(feature_tilde - feature_real), [1,2,3]))
 
 
 class Encoder(tf.keras.Model):
@@ -108,8 +108,8 @@ class Decoder(tf.keras.Model):
 
         # Sequential Decoder Layers:
         self.decoder_model = Sequential()
-        self.decoder_model.add(Dense(8*self.filter_size*args.img_width*args.img_height))
-        self.decoder_model.add(Reshape((args.img_width, args.img_height, 8*self.filter_size)))
+        self.decoder_model.add(Dense(8*self.filter_size*args.img_width*args.img_height/16/16))
+        self.decoder_model.add(Reshape((int(args.img_width/16), int(args.img_height/16), 8*self.filter_size)))
         self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.decoder_model.add(Activation('relu'))
         self.decoder_model.add(Conv2DTranspose(filters = 4*self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
@@ -192,24 +192,18 @@ def train(encoder, decoder, discriminator, real_images, cropped):
         batch_cropped = cropped[x*args.batch_size: (x+1)*args.batch_size]
 
         with tf.GradientTape() as enc_tape, tf.GradientTape() as dec_tape, tf.GradientTape() as disc_tape:
-            print(batch_cropped.shape)
             mean, logsigma, enc_out = encoder.call(batch_cropped)
-            print('encoder is done')
-            zp = tf.random.normal(shape=enc_out.shape)
-            print('prepare decoder')
+            zp = tf.random.truncated_normal(shape=enc_out.shape)
             dec_out = decoder.call(enc_out)
-            print('first decoder is done')
             dec_noise = decoder.call(zp)
-            print('second decoder is done')
             feature_tilde, disc_tilde_out = discriminator.call(dec_out)
             feature_real, disc_real_out = discriminator.call(batch_real)
             feature_fake, disc_fake_out = discriminator.call(dec_noise)
-            print('discriminators are done')
             kl_loss = kullback_leibler_loss(mean, logsigma)
             ll_loss = latent_layer_loss(feature_real, feature_tilde)
-            enc_loss = encoder.loss(kl_loss, ll_loss)
-            dec_loss = decoder.loss(disc_fake_out, disc_tilde_out, ll_loss)
-            disc_loss = discriminator.loss(disc_real_out, disc_fake_out, disc_tilde_out)
+            enc_loss = encoder.loss_function(kl_loss, ll_loss)
+            dec_loss = decoder.loss_function(disc_fake_out, disc_tilde_out, ll_loss)
+            disc_loss = discriminator.loss_function(disc_real_out, disc_fake_out, disc_tilde_out)
         enc_grads = enc_tape.gradient(enc_loss, encoder.trainable_variables)
         dec_grads = dec_tape.gradient(dec_loss, decoder.trainable_variables)
         disc_grads = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
@@ -217,6 +211,7 @@ def train(encoder, decoder, discriminator, real_images, cropped):
         decoder.optimizer.apply_gradients(zip(dec_grads, decoder.trainable_variables))
         discriminator.optimizer.apply_gradients(zip(disc_grads, discriminator.trainable_variables))
 
+        print("Training %d/%d complete" % (x, int(real_images.shape[0]/args.batch_size)) )
         if x % 10 == 0:
             print("Training %3.3f percent complete" % (100*x/(real_images.shape[0]/args.batch_size)))
             print("Encoder Loss:")
