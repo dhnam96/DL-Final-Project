@@ -35,9 +35,9 @@ def get_data(dir_path, resize=False):
             shutil.rmtree(preprocess_dir)
         os.mkdir(os.path.join(dir_path, 'preprocessed'))
 
-    data = []
+    data = np.zeros(shape=(len(dataset), 256, 256, 3), dtype=np.float32)
     for (index, img) in enumerate(dataset):
         img_data = load_and_process_image(img, index)
-        data.append(img_data)    
+        data[index] = img_data    
     
     return data

@@ -191,7 +191,8 @@ def train(encoder, decoder, discriminator, real_images, cropped):
         batch_real = real_images[x*args.batch_size: (x+1)*args.batch_size]
         batch_cropped = cropped[x*args.batch_size: (x+1)*args.batch_size]
 
-        with tf.GradientTape() as enc_tape, tf.GraidentTape() as dec_tape, tf.GradientTape() as disc_tape:
+        with tf.GradientTape() as enc_tape, tf.GradientTape() as dec_tape, tf.GradientTape() as disc_tape:
+            print(batch_cropped.shape)
             mean, logsigma, enc_out = encoder.call(batch_cropped)
             zp = tf.random_normal(shape=enc_out.shape)
             dec_out = decoder.call(enc_out)
@@ -227,13 +228,15 @@ def test():
 def crop_img(images, x, y):
     images_copy = np.copy(images)
     images_copy[:, y:, x:, :] = 0.0
-    return images
+    return images_copy
 
 
 def main():
     # Get data
-    train_data = np.array(get_data('./cars_train/preprocessed', resize=False))
-    cropped = crop_img(train_data[:args.batch_size], int(args.img_width/2), int(args.img_height/2))
+    train_data = get_data('./cars_train/preprocessed', resize=False)
+    print('Train is completed')
+    cropped = crop_img(train_data, int(args.img_width/2), int(args.img_height/2))
+    print('Images are cropped')
 
     # Initialize model
     encoder = Encoder(32, 5, 512)
