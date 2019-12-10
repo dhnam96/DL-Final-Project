@@ -225,7 +225,7 @@ def train(encoder, decoder, discriminator, real_images, cropped):
 
 
 def test(encoder, decoder, cropped):
-    for x in range(0, int(cropped.shape[0]/args.batch_size/10)):
+    for x in range(0, int(cropped.shape[0]/args.batch_size/4)):
         batch_cropped = cropped[x*args.batch_size: (x+1)*args.batch_size]
         mean, logsigma, enc_out = encoder.call(batch_cropped)
         dec_out = decoder.call(enc_out)
