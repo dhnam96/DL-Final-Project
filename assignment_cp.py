@@ -30,7 +30,7 @@ def sample(m, logsigma):
 def kullback_leibler_loss(m, logsigma):
     return -tf.reduce_sum(logsigma - tf.math.pow(m, 2) - tf.math.exp(logsigma) + 1)/2
 
-def latent_layer_loss(feature_real, feature_fake):
+def latent_layer_loss(feature_real, feature_tilde):
     return -tf.reduce_mean(tf.reduce_sum(tf.square(feature_fake - feature_real), [1,2,3]))
 
 
@@ -42,6 +42,9 @@ class Encoder(tf.keras.Model):
         self.filter_size = filter_size
         self.kernel_size = kernel_size
         self.channel = channel
+
+        # Hyperparameters:
+        self.optimizer = Adam(lr = 2e-4, beta_1 = 0.5)
 
         # Sequential Encoder Layers
         self.encoder_model = Sequential()
@@ -72,7 +75,6 @@ class Encoder(tf.keras.Model):
         return mean, logsigma, encoder_output
 
     def loss_function(self, kl_loss, latent_loss):
-        # TODO
         return kl_loss/(self.channel*args.batch_size) - latent_loss
 
 class Decoder(tf.keras.Model):
@@ -83,6 +85,9 @@ class Decoder(tf.keras.Model):
         self.filter_size = filter_size
         self.kernel_size = kernel_size
         self.channel = channel
+
+        # Hyperparameters:
+        self.optimizer = Adam(lr = 2e-4, beta_1 = 0.5)
 
         # Sequential Decoder Layers:
         self.decoder_model = Sequential()
@@ -123,6 +128,9 @@ class Discriminator(tf.keras.Model):
         self.kernel_size = kernel_size
         self.channel = channel
 
+        # Hyperparameters:
+        self.optimizer = Adam(lr = 2e-4, beta_1 = 0.5)
+
         # Feature
         self.discrim_model = Sequential()
         self.discrim_model.add(Conv2d(filters = 2*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
@@ -159,6 +167,41 @@ class Discriminator(tf.keras.Model):
         return self.real_loss(tf.ones_like(disc_real_output), disc_real_output) + \
             self.fake_loss(tf.zeros_like(disc_fake_output), disc_fake_output) + \
             self.tilde_loss(tf.zeros_like(disc_tilde_output), disc_tilde_output)
+
+def train(encoder, decoder, discriminator, real_images, cropped):
+    # here images should be a numpy array
+    for x in range(0, int(images.shape[0]/args.batch_size)):
+        batch_real = real_images[x*args.batch_size: (x+1)*args.batch_size]
+        batch_cropped = cropped[x*args.batch_size: (x+1)*args.batch_size]
+
+        with tf.GradientTape() as enc_tape, tf.GraidentTape() as dec_tape, tf.GradientTape() as disc_tape:
+            mean, logsigma, enc_out = encoder.call(batch_cropped)
+            zp = tf.random_normal(shape=enc_out.shape)
+            dec_out = decoder.call(enc_out)
+            dec_noise = decoder.call(zp)
+            feature_tilde, disc_tilde_out = discriminator.call(dec_out)
+            feature_real, disc_real_out = discriminator.call(batch_real)
+            feature_fake, disc_fake_out = discriminator.call(dec_noise)
+            kl_loss = kullback_leibler_loss(mean, logsigma)
+            ll_loss = latent_layer_loss(feature_real, feature_tilde)
+            enc_loss = encoder.loss(kl_loss, ll_loss)
+            dec_loss = decoder.loss(disc_fake_out, disc_tilde_out, ll_loss)
+            disc_loss = discriminator.loss(disc_real_out, disc_fake_out, disc_tilde_out)
+        enc_grads = enc_tape.gradient(enc_loss, encoder.trainable_variables)
+        dec_grads = dec_tape.gradient(dec_loss, decoder.trainable_variables)
+        disc_grads = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
+        encoder.optimizer.apply_gradients(zip(enc_grads, encoder.trainable_variables))
+        decoder.optimizer.apply_gradients(zip(dec_grads, decoder.trainable_variables))
+        discriminator.optimizer.apply_gradients(zip(disc_grads, discriminator.trainable_variables))
+
+        if x % 10 == 0:
+            print("Training %3.3f percent complete" % (100*x/(images.shape[0]/args.batch_size)))
+            print("Encoder Loss:")
+            print(enc_loss)
+            print("Decoder Loss:")
+            print(dec_loss)
+            print("Discriminator Loss:")
+            print(disc_loss)
 
 
 
