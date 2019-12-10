@@ -5,6 +5,7 @@ import tensorflow as tf
 from keras.models import Sequential
 from keras.layers import Dense, Activation, LeakyReLU, BatchNormalization, Conv2d, Flatten, Reshape, Conv2DTranspose
 from keras.optimizers import Adam
+from keras.losses import BinaryCrossentropy
 from preprocess import get_data
 from imageio import imwrite
 import argparse
@@ -50,8 +51,8 @@ class Encoder(tf.keras.Model):
         self.encoder_model.add(Flatten())
 
         # Intermediate Layers:
-        self.mean = tf.keras.layers.Dense(dense_out)
-        self.logsigma = tf.keras.layers.Dense(dense_out, activation="tanh")
+        self.mean = Dense(dense_out)
+        self.logsigma = Dense(dense_out, activation="tanh")
 
     @tf.function
     def call(self, inputs):
@@ -117,9 +118,9 @@ class Discriminator(tf.keras.Model):
         self.dense = Dense(1, activation = 'sigmoid')
 
         # Define loss
-        self.real_loss = tf.keras.losses.BinaryCrossentropy()
-        self.fake_loss = tf.keras.losses.BinaryCrossentropy()
-        self.tilde_loss = tf.keras.losses.BinaryCrossentropy()
+        self.real_loss = BinaryCrossentropy()
+        self.fake_loss = BinaryCrossentropy()
+        self.tilde_loss = BinaryCrossentropy()
 
     @tf.function
     def call(self, inputs):
