@@ -16,7 +16,7 @@ gpu_available = tf.test.is_gpu_available()
 print("GPU Available: ", gpu_available)
 
 parser = argparse.ArgumentParser(description='GAN')
-parser.add_argument('--batch-size', type=int, default=8,
+parser.add_argument('--batch-size', type=int, default=64,
                     help='Sizes of image batches fed through the network')
 parser.add_argument('--out-dir', type=str, default='./output',
                     help='Data where sampled output images will be written')
@@ -92,7 +92,7 @@ class Encoder(tf.keras.Model):
         return mean, logsigma, encoder_output
 
     def loss_function(self, kl_loss, latent_loss):
-        return kl_loss/(self.channel*args.batch_size) - latent_loss
+        return kl_loss/(self.channel*args.batch_size) + 1e-6 * latent_loss
 
 class Decoder(tf.keras.Model):
     def __init__(self, filter_size, kernel_size, channel):
@@ -133,7 +133,7 @@ class Decoder(tf.keras.Model):
 
     def loss_function(self, disc_fake_output, disc_tilde_output, latent_loss):
         return self.fake_loss(tf.zeros_like(disc_fake_output), disc_fake_output) + \
-            self.tilde_loss(tf.zeros_like(disc_tilde_output), disc_tilde_output) - 1e-6 * latent_loss
+            self.tilde_loss(tf.zeros_like(disc_tilde_output), disc_tilde_output) + 1e-6 * latent_loss
 
 
 class Discriminator(tf.keras.Model):
@@ -202,7 +202,11 @@ def train(encoder, decoder, discriminator, real_images, cropped):
             kl_loss = kullback_leibler_loss(mean, logsigma)
             ll_loss = latent_layer_loss(feature_real, feature_tilde)
             enc_loss = encoder.loss_function(kl_loss, ll_loss)
+            print('Encoder Loss:')
+            print(enc_loss)
             dec_loss = decoder.loss_function(disc_fake_out, disc_tilde_out, ll_loss)
+            print('Decoder Loss:')
+            print(dec_loss)
             disc_loss = discriminator.loss_function(disc_real_out, disc_fake_out, disc_tilde_out)
         enc_grads = enc_tape.gradient(enc_loss, encoder.trainable_variables)
         dec_grads = dec_tape.gradient(dec_loss, decoder.trainable_variables)
@@ -212,7 +216,7 @@ def train(encoder, decoder, discriminator, real_images, cropped):
         discriminator.optimizer.apply_gradients(zip(disc_grads, discriminator.trainable_variables))
 
         print("Training %d/%d complete" % (x, int(real_images.shape[0]/args.batch_size)) )
-        if x % 10 == 0:
+        if x % 10 == 0 and x > 0:
             print("Training %3.3f percent complete" % (100*x/(real_images.shape[0]/args.batch_size)))
             print("Encoder Loss:")
             print(enc_loss)
