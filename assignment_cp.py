@@ -2,6 +2,7 @@ import os
 import sys
 import numpy as np
 import tensorflow as tf
+import math
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Activation, LeakyReLU, BatchNormalization, Conv2D, Flatten, Reshape, Conv2DTranspose
 from tensorflow.keras.optimizers import Adam
@@ -15,7 +16,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 gpu_available = tf.test.is_gpu_available()
 print("GPU Available: ", gpu_available)
 parser = argparse.ArgumentParser(description='GAN')
-parser.add_argument('--batch-size', type=int, default=128,
+parser.add_argument('--batch-size', type=int, default=256,
                     help='Sizes of image batches fed through the network')
 parser.add_argument('--out-dir', type=str, default='./output',
                     help='Data where sampled output images will be written')
@@ -45,7 +46,7 @@ def kullback_leibler_loss(m, logsigma):
     return -tf.reduce_sum(logsigma - tf.math.pow(m, 2) - tf.math.exp(logsigma) + 1)/2
 
 def latent_layer_loss(feature_real, feature_tilde):
-    return -tf.reduce_mean(tf.reduce_sum(tf.square(feature_tilde - feature_real), [1,2,3]))
+    return tf.reduce_mean(tf.reduce_sum(-tf.square(feature_tilde - feature_real), [1,2,3])/2 + (-0.5 * tf.math.log(2*np.pi)))
 
 
 class Encoder(tf.keras.Model):
@@ -89,7 +90,7 @@ class Encoder(tf.keras.Model):
         return mean, logsigma, encoder_output
 
     def loss_function(self, kl_loss, latent_loss):
-        return kl_loss/(self.channel*args.batch_size) + 1e-6 * latent_loss
+        return kl_loss/(self.channel*args.batch_size) - latent_loss/(4 * 4 * 512)
 
 class Decoder(tf.keras.Model):
     def __init__(self, filter_size, kernel_size, channel):
@@ -130,7 +131,7 @@ class Decoder(tf.keras.Model):
 
     def loss_function(self, disc_fake_output, disc_tilde_output, latent_loss):
         return self.fake_loss(tf.ones_like(disc_fake_output), disc_fake_output) + \
-            self.tilde_loss(tf.ones_like(disc_tilde_output), disc_tilde_output) + 1e-6 * latent_loss
+            self.tilde_loss(tf.ones_like(disc_tilde_output), disc_tilde_output) - 1e-6 * latent_loss
 
 
 class Discriminator(tf.keras.Model):
@@ -224,7 +225,6 @@ def train(encoder, decoder, discriminator, real_images, cropped):
 
 
 def test(encoder, decoder, cropped):
-    ### BATCH CROP HERE
     for x in range(0, int(cropped.shape[0]/args.batch_size/10)):
         batch_cropped = cropped[x*args.batch_size: (x+1)*args.batch_size]
         mean, logsigma, enc_out = encoder.call(batch_cropped)
@@ -235,6 +235,7 @@ def test(encoder, decoder, cropped):
             image = output[i]
             s = args.out_dir + '/' + str(i) + '.png'
             imwrite(s, image)
+        print("Training %d/%d complete" % (x, int(batch_cropped.shape[0]/args.batch_size)))
 
 def crop_img(images, x, y):
     images_copy = np.copy(images)
