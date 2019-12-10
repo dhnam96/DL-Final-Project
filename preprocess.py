@@ -38,6 +38,6 @@ def get_data(dir_path, target_size, resize=False):
     data = np.zeros(shape=(len(dataset), target_size[0], target_size[1], 3), dtype=np.float32)
     for (index, img) in enumerate(dataset):
         img_data = load_and_process_image(img, index)
-        data[index] = img_data    
+        data[index] = img_data / 255   
     
     return data

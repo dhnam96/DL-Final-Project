@@ -132,8 +132,8 @@ class Decoder(tf.keras.Model):
         return self.decoder_model(inputs)
 
     def loss_function(self, disc_fake_output, disc_tilde_output, latent_loss):
-        return self.fake_loss(tf.zeros_like(disc_fake_output), disc_fake_output) + \
-            self.tilde_loss(tf.zeros_like(disc_tilde_output), disc_tilde_output) + 1e-6 * latent_loss
+        return self.fake_loss(tf.ones_like(disc_fake_output), disc_fake_output) + \
+            self.tilde_loss(tf.ones_like(disc_tilde_output), disc_tilde_output) + 1e-6 * latent_loss
 
 
 class Discriminator(tf.keras.Model):
