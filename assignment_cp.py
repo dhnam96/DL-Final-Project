@@ -1,6 +1,8 @@
 ########################## Printing plot ##########################
 import matplotlib
 matplotlib.use('Agg')
+import tensorflow_gan as tfgan
+import tensorflow_hub as hub
 ########################## Printing plot ##########################
 import os
 import sys
@@ -14,8 +16,6 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.losses import BinaryCrossentropy
 from preprocess import get_data
 from imageio import imwrite
-import tensorflow_gan as tfgan
-import tensorflow_hub as hub
 import argparse
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
