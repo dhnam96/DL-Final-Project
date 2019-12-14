@@ -306,7 +306,7 @@ def train_encoder(encoder, decoder, discriminator, real_images, mask, manager):
             manager.save()
 
         # print("Training %d/%d complete" % (x, int(real_images.shape[0]/args.batch_size)) )
-        if x % 100 == 0 and x > 0:
+        if x % 10 == 0 and x > 0:
             print("Training %3.3f percent complete" % (100*x/(real_images.shape[0]/args.batch_size)))
             print("Encoder Loss:")
             print(e_loss)
@@ -323,7 +323,7 @@ def test(decoder, channel):
 
     ### Below, we've already provided code to save these generated images to files on disk
     # Rescale the image from (-1, 1) to (0, 255)
-    img = ((img / 2) - 0.5) * 255
+    img = ((img / 2) + 0.5) * 255
     # Convert to uint8
     img = img.astype(np.uint8)
     # Save images to disk
@@ -336,22 +336,22 @@ def test_completion(encoder, decoder, test_data, mask):
     for x in range(0, int(test_data.shape[0]/args.batch_size/4)):
         batch = test_data[x*args.batch_size: (x+1)*args.batch_size]
         latent = encoder(batch * mask)
-        img = generator(latent).numpy()
+        img = decoder(latent).numpy()
         img_comb = batch * mask + img * ( 1 - mask )
-        img = ((img / 2) - 0.5) * 255
-        img_comb = ((img_comb / 2) - 0.5) * 255
+        img = ((img / 2) + 0.5) * 255
+        img_comb = ((img_comb / 2) + 0.5) * 255
 
         for i in range(0, args.batch_size):
             img_i = img[i]
-            s = args.out_dir+'/'+str(iteration)+'_'+str(i)+'.png'
+            s = args.out_dir+'/'+str(x)+'_'+str(i)+'.png'
             imwrite(s, img_i)
 
             img_comb_i = img_comb[i]
-            s_c = args.out_dir+'/'+str(iteration)+'_'+str(i)+'_comb.png'
+            s_c = args.out_dir+'/'+str(x)+'_'+str(i)+'_comb.png'
             imwrite(s_c, img_comb_i)
 
             img_org_i = batch[i]
-            s_org = args.out_dir+'/'+str(iteration)+'_'+str(i)+'_org.png'
+            s_org = args.out_dir+'/'+str(x)+'_'+str(i)+'_org.png'
             imwrite(s_org, img_org_i)
 
 def crop_img(images, x, y):
