@@ -316,18 +316,42 @@ def train_encoder(encoder, decoder, discriminator, real_images, mask):
 
     return fid_list, loss_list
 
-def test(encoder, decoder, cropped, mask):
-    for x in range(0, int(cropped.shape[0]/args.batch_size/4)):
-        batch_cropped = cropped[x*args.batch_size: (x+1)*args.batch_size]
-        mean, logsigma, enc_out = encoder.call(batch_cropped)
-        dec_out = decoder.call(enc_out)
-        generated = dec_out * 255
-        output = generated.numpy().astype(np.uint8)
+def test(decoder, channel):
+    random_noise = np.random.normal(size=(args.batch_size, channel)).astype(np.float32)
+    img = decoder(random_noise).numpy()  
+
+    ### Below, we've already provided code to save these generated images to files on disk
+    # Rescale the image from (-1, 1) to (0, 255)
+    img = ((img / 2) - 0.5) * 255
+    # Convert to uint8
+    img = img.astype(np.uint8)
+    # Save images to disk
+    for i in range(0, args.batch_size):
+        img_i = img[i]
+        s = args.out_dir+'/'+str(i)+'.png'
+        imwrite(s, img_i)
+
+def test_completion(encoder, encoder, test_data, mask):
+    for x in range(0, int(test_data.shape[0]/args.batch_size/4)):
+        batch = test_data[x*args.batch_size: (x+1)*args.batch_size]
+        latent = encoder(batch * mask)
+        img = generator(latent).numpy()
+        img_comb = batch * mask + img * ( 1 - mask )
+        img = ((img / 2) - 0.5) * 255
+        img_comb = ((img_comb / 2) - 0.5) * 255
+
         for i in range(0, args.batch_size):
-            image = output[i]
-            s = args.out_dir + '/' + str(i) + '.png'
-            imwrite(s, image)
-        print("Training %d/%d complete" % (x, int(batch_cropped.shape[0]/args.batch_size)))
+            img_i = img[i]
+            s = args.out_dir+'/'+str(iteration)+'_'+str(i)+'.png'
+            imwrite(s, img_i)
+                
+            img_comb_i = img_comb[i]
+            s_c = args.out_dir+'/'+str(iteration)+'_'+str(i)+'_comb.png'
+            imwrite(s_c, img_comb_i)
+
+            img_org_i = batch[i]
+            s_org = args.out_dir+'/'+str(iteration)+'_'+str(i)+'_org.png'
+            imwrite(s_org, img_org_i)
 
 def crop_img(images, x, y):
     images_copy = np.copy(images)
@@ -405,7 +429,7 @@ def main():
                     print("**** SAVING CHECKPOINT AT END OF EPOCH ****")
                     manager.save()
             if args.mode == 'test':
-                test(generator)
+                test(generator, 512)
 
             if args.mode == 'train_completion':
                 loss_list = []
@@ -423,7 +447,7 @@ def main():
                     manager.save()
 
             if args.mode == 'test_completion':
-                test_completion(encoder, generator, dataset_iterator, mask)
+                test_completion(encoder, encoder, test_data, mask)
 
 
     except RuntimeError as e:
