@@ -339,8 +339,9 @@ def test_completion(encoder, decoder, test_data, mask):
         img = decoder(latent).numpy()
         img_comb = batch * mask + img * ( 1 - mask )
         img = ((img / 2) + 0.5) * 255
+        img = img.astype(np.uint8)
         img_comb = ((img_comb / 2) + 0.5) * 255
-
+        img_comb = img_comb.astype(np.uint8)
         for i in range(0, args.batch_size):
             img_i = img[i]
             s = args.out_dir+'/'+str(x)+'_'+str(i)+'.png'
