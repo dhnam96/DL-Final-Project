@@ -257,7 +257,7 @@ def train(decoder, discriminator, real_images, channel, manager):
             print(dec_loss)
             print("Discriminator Loss:")
             print(disc_loss)
-            fid_ = fid_function(batch_real, dec_out)
+            fid_ = fid_function(batch_real, pred_img)
             fid_list.append(fid_.numpy())
             print("FID score:")
             print(fid_)
