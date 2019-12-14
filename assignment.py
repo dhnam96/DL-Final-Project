@@ -165,7 +165,7 @@ class Decoder(tf.keras.Model):
         return self.decoder_model(inputs)
 
     @tf.function
-    def loss_function(self, disc_fake_output, disc_tilde_output, latent_loss):
+    def loss_function(self, disc_fake_output):
         return self.fake_loss(tf.ones_like(disc_fake_output), disc_fake_output)
 
 ########################## Discriminator ##########################
@@ -216,7 +216,7 @@ class Discriminator(tf.keras.Model):
         return self.discrim_model(inputs)
 
     @tf.function
-    def loss_function(self, disc_real_output, disc_fake_output, disc_tilde_output):
+    def loss_function(self, disc_real_output, disc_fake_output):
         return self.real_loss(tf.ones_like(disc_real_output), disc_real_output) + \
             self.fake_loss(tf.zeros_like(disc_fake_output), disc_fake_output)
 
@@ -239,7 +239,7 @@ def train(decoder, discriminator, real_images, channel, manager):
             disc_loss = discriminator.loss_function(disc_real, disc_fake)
 
         # Optimize discriminator
-        if iteration % args.num_gen_updates == 0:
+        if x % args.num_gen_updates == 0:
             disc_gradients = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
             discriminator.optimizer.apply_gradients(zip(disc_gradients, discriminator.trainable_variables))
 
@@ -248,7 +248,7 @@ def train(decoder, discriminator, real_images, channel, manager):
         decoder.optimizer.apply_gradients(zip(dec_gradients, decoder.trainable_variables))
 
         # Save
-        if iteration % args.save_every == 0:
+        if x % args.save_every == 0:
             manager.save()
 
         # print("Training %d/%d complete" % (x, int(real_images.shape[0]/args.batch_size)) )
@@ -352,7 +352,7 @@ def plot(l, n, epoch):
 
 def main():
     # Get data
-    image_data = get_data('./lfw', target_size=(args.img_width, args.img_height), processed=False)
+    image_data = get_data('./lfw', target_size=(args.img_width, args.img_height), processed=True)
     partition = int(len(image_data) * 0.8)
     train_data = np.copy(image_data[:partition])
     test_data = np.copy(image_data[partition:])
