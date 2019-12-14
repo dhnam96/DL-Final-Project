@@ -29,7 +29,7 @@ parser.add_argument('--img-width', type=int, default=64,
                     help='Width of images in pixels')
 parser.add_argument('--img-height', type=int, default=64,
                     help='Height of images in pixels')
-parser.add_argument('--num-epochs', type=int, default=50,
+parser.add_argument('--num-epochs', type=int, default=100,
                     help='Number of passes through the training data to make before stopping')
 parser.add_argument('--device', type=str, default='GPU:0' if gpu_available else 'CPU:0',
                     help='specific the device of computation eg. CPU:0, GPU:0, GPU:1, GPU:2, ... ')
