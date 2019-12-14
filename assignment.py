@@ -269,7 +269,7 @@ def train(decoder, discriminator, real_images, channel, manager):
     return dec_loss_list, disc_loss_list, fid_list
 
 # Train the model for one epoch.
-def train_encoder(encoder, decoder, Discriminator, real_images, mask):
+def train_encoder(encoder, decoder, discriminator, real_images, mask):
     """
     Train the model for one epoch. Save a checkpoint every 500 or so batches.
 
@@ -355,13 +355,16 @@ def main():
     train_data = get_data('./cars_train/preprocessed', target_size=(args.img_width, args.img_height), resize=False)
     test_data = get_data('./cars_test/preprocessed', target_size=(args.img_width, args.img_height), resize=False)
     print('Train and test data retrieved')
-    cropped_train = crop_img(train_data, int(2*args.img_width/3), int(2*args.img_height/2))
-    cropped_test = crop_img(test_data, int(2*args.img_width/3), int(2*args.img_height/3))
-    print('Images are cropped')
+    # cropped_train = crop_img(train_data, int(2*args.img_width/3), int(2*args.img_height/2))
+    # cropped_test = crop_img(test_data, int(2*args.img_width/3), int(2*args.img_height/3))
+    # print('Images are cropped')
+    # Define mask
+    mask = np.ones((64, 64, 3), dtype=np.float32)
+    mask[32: , 32: , : ] = 0
 
     # Initialize model
-    encoder = Encoder(32, 5, 512)
-    decoder = Decoder(32, 5, 3)
+    encoder = Encoder(64, 5, 512)
+    decoder = Decoder(64, 5, 3)
     discriminator = Discriminator(64, 5, 1)
 
     # For saving/loading models
@@ -381,9 +384,9 @@ def main():
     fid_list = []
     ########################## Printing plot ##########################
 
-    if args.restore_checkpoint or args.mode == 'test':
+    if args.restore_checkpoint or args.mode == 'test' or args.mode == 'train_completion' or args.mode == 'train_test':
         # restores the latest checkpoint using from the manager
-        checkpoint.restore(manager.latest_checkpoint)
+        checkpoint.restore(manager.latest_checkpoint) 
 
     try:
         # Specify an invalid GPU device
@@ -391,20 +394,40 @@ def main():
             if args.mode == 'train':
                 for epoch in range(0, args.num_epochs):
                     print('========================== EPOCH %d  ==========================' % epoch)
-                    ########################## Printing plot ##########################
-                    enc_loss, dec_loss, disc_loss, fid = train(encoder, decoder, discriminator, train_data, cropped_train)
-                    enc_loss_list += enc_loss
+                    dec_loss, disc_loss, fid = train(decoder, discriminator, train_data, 512, manager)
+                    print("Average FID for Epoch: " + str(np.mean(fid)))
+                    fid_list += f
                     dec_loss_list += dec_loss
                     disc_loss_list += disc_loss
-                    fid_list += fid
-                    plot(enc_loss_list, dec_loss_list, disc_loss_list, fid_list, epoch)
-                    ########################## Printing plot ##########################
-                    # print("Average FID for Epoch: " + str(avg_fid))
+                    plot(fid_list, 'FID', epoch)
+                    plot(dec_loss_list, 'Decoder Loss', epoch)
+                    plot(disc_loss_list, 'Discriminator Loss', epoch)
+
                     # Save at the end of the epoch, too
                     print("**** SAVING CHECKPOINT AT END OF EPOCH ****")
                     manager.save()
             if args.mode == 'test':
-                test(encoder, decoder, cropped_test)
+                test(generator)
+            
+            if args.mode == 'train_completion':
+                loss_list = []
+                fid_list = []
+                for epoch in range(0, args.num_epochs):
+                    print('========================== COMPLETION EPOCH %d  ==========================' % epoch)
+                    f, l = train_encoder(encoder, decoder, discriminator, train_data, mask, manager)
+                    fid_list += f
+                    enc_loss_list += l
+                    plot(fid_list, 'FID', epoch)
+                    plot(enc_loss_list, 'Encoder Loss', epoch)
+                    # print("Average FID for Epoch: " + str(avg_fid))
+                    # Save at the end of the epoch, too
+                    print("**** SAVING CHECKPOINT AT END OF EPOCH ****")
+                    manager.save()
+            
+            if args.mode == 'test_completion':
+                test_completion(encoder, generator, dataset_iterator, mask)
+
+
     except RuntimeError as e:
         print(e)
 
