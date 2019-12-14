@@ -331,7 +331,7 @@ def test(decoder, channel):
         s = args.out_dir+'/'+str(i)+'.png'
         imwrite(s, img_i)
 
-def test_completion(encoder, encoder, test_data, mask):
+def test_completion(encoder, decoder, test_data, mask):
     for x in range(0, int(test_data.shape[0]/args.batch_size/4)):
         batch = test_data[x*args.batch_size: (x+1)*args.batch_size]
         latent = encoder(batch * mask)
@@ -447,7 +447,7 @@ def main():
                     manager.save()
 
             if args.mode == 'test_completion':
-                test_completion(encoder, encoder, test_data, mask)
+                test_completion(encoder, decoder, test_data, mask)
 
 
     except RuntimeError as e:
