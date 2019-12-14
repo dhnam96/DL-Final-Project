@@ -237,7 +237,6 @@ def train(decoder, discriminator, real_images, channel, manager):
 
             dec_loss = decoder.loss_function(disc_fake)
             disc_loss = discriminator.loss_function(disc_real, disc_fake)
-
         # Optimize discriminator
         if x % args.num_gen_updates == 0:
             disc_gradients = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
@@ -252,7 +251,7 @@ def train(decoder, discriminator, real_images, channel, manager):
             manager.save()
 
         # print("Training %d/%d complete" % (x, int(real_images.shape[0]/args.batch_size)) )
-        if x % 100 == 0 and x > 0:
+        if x % 10 == 0 and x > 0:
             print("Training %3.3f percent complete" % (100*x/(real_images.shape[0]/args.batch_size)))
             print("Decoder Loss:")
             print(dec_loss)
