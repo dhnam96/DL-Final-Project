@@ -41,7 +41,7 @@ parser.add_argument('--restore-checkpoint', action='store_true',
                     help='Use this flag if you want to resuming training from a previously-saved checkpoint')
 parser.add_argument('--num-gen-updates', type=int, default=2,
                     help='Number of generator updates per discriminator update')
-parser.add_argument('--lambda', type=float, default=1000,
+parser.add_argument('--lambdas', type=float, default=1000,
                     help='Height of images in pixels')
 args = parser.parse_args()
 
@@ -121,7 +121,7 @@ class Encoder(tf.keras.Model):
     @tf.function
     def loss_function(self, pred_patch, true_patch, disc_fake_output):
         return self.loss(tf.ones_like(disc_fake_output), disc_fake_output) + \
-            tf.reduce_mean(tf.abs(pred_patch - true_patch)) * args.lambda
+            tf.reduce_mean(tf.abs(pred_patch - true_patch)) * args.lambdas
 
 
 ########################## Decoder ##########################
