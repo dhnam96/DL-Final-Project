@@ -59,8 +59,8 @@ def latent_layer_loss(feature_real, feature_tilde):
 module = tf.keras.Sequential([hub.KerasLayer("https://tfhub.dev/google/tf2-preview/inception_v3/classification/4", output_shape=[1001])])
 def fid_function(real_image_batch, generated_image_batch):
     """
-    Given a batch of real images and a batch of generated images, this function pulls down a pre-trained inception 
-    v3 network and then uses it to extract the activations for both the real and generated images. The distance of 
+    Given a batch of real images and a batch of generated images, this function pulls down a pre-trained inception
+    v3 network and then uses it to extract the activations for both the real and generated images. The distance of
     these activations is then computed. The distance is a measure of how "realistic" the generated images are.
 
     :param real_image_batch: a batch of real images from the dataset, shape=[batch_size, height, width, channels]
@@ -237,16 +237,16 @@ def train(decoder, discriminator, real_images, channel, manager):
 
             dec_loss = decoder.loss_function(disc_fake)
             disc_loss = discriminator.loss_function(disc_real, disc_fake)
-        
+
         # Optimize discriminator
         if iteration % args.num_gen_updates == 0:
             disc_gradients = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
             discriminator.optimizer.apply_gradients(zip(disc_gradients, discriminator.trainable_variables))
-        
+
         # Optimize generator
         dec_gradients = dec_tape.gradient(dec_loss, decoder.trainable_variables)
         decoder.optimizer.apply_gradients(zip(dec_gradients, decoder.trainable_variables))
-        
+
         # Save
         if iteration % args.save_every == 0:
             manager.save()
@@ -265,7 +265,7 @@ def train(decoder, discriminator, real_images, channel, manager):
 
         dec_loss_list.append(dec_loss.numpy())
         disc_loss_list.append(disc_loss.numpy())
-    
+
     return dec_loss_list, disc_loss_list, fid_list
 
 # Train the model for one epoch.
@@ -283,7 +283,7 @@ def train_encoder(encoder, decoder, discriminator, real_images, mask):
     # Loop over our data until we run out
     fid_list = []
     loss_list = []
-    
+
     # here images should be a numpy array
     for x in range(0, int(real_images.shape[0]/args.batch_size)):
         batch_real = real_images[x*args.batch_size: (x+1)*args.batch_size]
@@ -300,7 +300,7 @@ def train_encoder(encoder, decoder, discriminator, real_images, mask):
         # Optimize generator
         e_gradients = tape.gradient(e_loss, encoder.trainable_variables)
         encoder.optimizer.apply_gradients(zip(e_gradients, encoder.trainable_variables))
-        
+
         # Save
         if iteration % args.save_every == 0:
             manager.save()
@@ -314,7 +314,7 @@ def train_encoder(encoder, decoder, discriminator, real_images, mask):
             fid_list.append(fid_.numpy())
             print('FID score')
             print(fid_)
-        
+
     return fid_list, loss_list
 
 def test(encoder, decoder, cropped, mask):
@@ -347,17 +347,16 @@ def plot(l, n, epoch):
     plt.title('{}'.format(n))
     plt.savefig('{}.png'.format(n))
     plt.clf()
-########################## Printing plot ########################## 
+########################## Printing plot ##########################
 
 
 def main():
     # Get data
-    train_data = get_data('./cars_train/preprocessed', target_size=(args.img_width, args.img_height), resize=False)
-    test_data = get_data('./cars_test/preprocessed', target_size=(args.img_width, args.img_height), resize=False)
+    image_data = get_data('./lfw', target_size=(args.img_width, args.img_height), processed=False)
+    partition = int(len(image_data) * 0.8)
+    train_data = np.copy(image_data[:partition])
+    test_data = np.copy(image_data[partition:])
     print('Train and test data retrieved')
-    # cropped_train = crop_img(train_data, int(2*args.img_width/3), int(2*args.img_height/2))
-    # cropped_test = crop_img(test_data, int(2*args.img_width/3), int(2*args.img_height/3))
-    # print('Images are cropped')
     # Define mask
     mask = np.ones((64, 64, 3), dtype=np.float32)
     mask[32: , 32: , : ] = 0
@@ -386,7 +385,7 @@ def main():
 
     if args.restore_checkpoint or args.mode == 'test' or args.mode == 'train_completion' or args.mode == 'train_test':
         # restores the latest checkpoint using from the manager
-        checkpoint.restore(manager.latest_checkpoint) 
+        checkpoint.restore(manager.latest_checkpoint)
 
     try:
         # Specify an invalid GPU device
@@ -408,7 +407,7 @@ def main():
                     manager.save()
             if args.mode == 'test':
                 test(generator)
-            
+
             if args.mode == 'train_completion':
                 loss_list = []
                 fid_list = []
@@ -423,7 +422,7 @@ def main():
                     # Save at the end of the epoch, too
                     print("**** SAVING CHECKPOINT AT END OF EPOCH ****")
                     manager.save()
-            
+
             if args.mode == 'test_completion':
                 test_completion(encoder, generator, dataset_iterator, mask)
 
