@@ -108,7 +108,7 @@ class Encoder(tf.keras.Model):
         self.encoder_model.add(LeakyReLU(alpha = 0.2))
 
         self.encoder_model.add(Flatten())
-        self.model.add(Dense(channel, activation='tanh'))
+        self.encoder_model.add(Dense(channel, activation='tanh'))
 
         # Intermediate Layers:
         # self.mean = Dense(channel)
@@ -142,19 +142,19 @@ class Decoder(tf.keras.Model):
         self.decoder_model.add(Dense(8*self.filter_size*args.img_width*args.img_height/16/16))
         self.decoder_model.add(Reshape((int(args.img_width/16), int(args.img_height/16), 8*self.filter_size)))
         self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
-        self.encoder_model.add(LeakyReLU(alpha = 0.2))
+        self.decoder_model.add(LeakyReLU(alpha = 0.2))
 
         self.decoder_model.add(Conv2DTranspose(filters = 4*self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
-        self.encoder_model.add(LeakyReLU(alpha = 0.2))
+        self.decoder_model.add(LeakyReLU(alpha = 0.2))
 
         self.decoder_model.add(Conv2DTranspose(filters = 2*self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
-        sself.encoder_model.add(LeakyReLU(alpha = 0.2))
+        self.decoder_model.add(LeakyReLU(alpha = 0.2))
 
         self.decoder_model.add(Conv2DTranspose(filters = self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
-        self.encoder_model.add(LeakyReLU(alpha = 0.2))
+        self.decoder_model.add(LeakyReLU(alpha = 0.2))
 
         self.decoder_model.add(Conv2DTranspose(filters = self.channel, kernel_size = self.kernel_size, strides = [2, 2], padding="same", activation='tanh', kernel_initializer = tf.random_normal_initializer(0, 0.02)))
 
@@ -195,11 +195,11 @@ class Discriminator(tf.keras.Model):
         self.discrim_model.add(LeakyReLU(alpha = 0.2))
 
         self.discrim_model.add(Conv2D(filters = 8*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
-        self.model.add(BatchNormalization())
-        self.model.add(LeakyReLU(alpha=0.2))
+        self.discrim_model.add(BatchNormalization())
+        self.discrim_model.add(LeakyReLU(alpha=0.2))
 
-        self.model.add(Flatten())
-        self.model.add(Dense(self.channel, activation='sigmoid'))
+        self.discrim_model.add(Flatten())
+        self.discrim_model.add(Dense(self.channel, activation='sigmoid'))
 
         # Additional Layers to pass through after the sequential model
         # self.batch_norm = BatchNormalization(epsilon = 1e-5)
@@ -395,7 +395,7 @@ def main():
                     print('========================== EPOCH %d  ==========================' % epoch)
                     dec_loss, disc_loss, fid = train(decoder, discriminator, train_data, 512, manager)
                     print("Average FID for Epoch: " + str(np.mean(fid)))
-                    fid_list += f
+                    fid_list += fid
                     dec_loss_list += dec_loss
                     disc_loss_list += disc_loss
                     plot(fid_list, 'FID', epoch)
