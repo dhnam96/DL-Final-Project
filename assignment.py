@@ -34,7 +34,7 @@ parser.add_argument('--num-epochs', type=int, default=100,
 parser.add_argument('--device', type=str, default='GPU:0' if gpu_available else 'CPU:0',
                     help='specific the device of computation eg. CPU:0, GPU:0, GPU:1, GPU:2, ... ')
 parser.add_argument('--mode', type=str, default='train',
-                    help='Can be "train" or "test"')
+                    help='Can be "train", "test", "train_completion", or "test_completion"')
 parser.add_argument('--save-every', type=int, default=500,
                     help='Save the state of the network after every [this many] training iterations')
 parser.add_argument('--restore-checkpoint', action='store_true',
@@ -110,6 +110,7 @@ class Encoder(tf.keras.Model):
         self.encoder_model.add(Flatten())
         self.encoder_model.add(Dense(channel, activation='tanh'))
 
+        self.loss = BinaryCrossentropy()
         # Intermediate Layers:
         # self.mean = Dense(channel)
         # self.logsigma = Dense(channel, activation="tanh")
@@ -268,7 +269,7 @@ def train(decoder, discriminator, real_images, channel, manager):
     return dec_loss_list, disc_loss_list, fid_list
 
 # Train the model for one epoch.
-def train_encoder(encoder, decoder, discriminator, real_images, mask):
+def train_encoder(encoder, decoder, discriminator, real_images, mask, manager):
     """
     Train the model for one epoch. Save a checkpoint every 500 or so batches.
 
@@ -289,10 +290,10 @@ def train_encoder(encoder, decoder, discriminator, real_images, mask):
 
         with tf.GradientTape() as tape:
             latent = encoder.call(batch_real * mask)
-            gen_tmp = generator.call(latent)
-            gen_output = batch * mask + gen_tmp * ( 1 - mask )
+            gen_tmp = decoder.call(latent)
+            gen_output = batch_real * mask + gen_tmp * ( 1 - mask )
             disc_fake = discriminator.call(gen_output)
-            e_loss = encoder.loss_function(gen_output, batch_real, d_fake)
+            e_loss = encoder.loss_function(gen_output, batch_real, disc_fake)
 
         loss_list.append(e_loss.numpy())
 
@@ -301,7 +302,7 @@ def train_encoder(encoder, decoder, discriminator, real_images, mask):
         encoder.optimizer.apply_gradients(zip(e_gradients, encoder.trainable_variables))
 
         # Save
-        if iteration % args.save_every == 0:
+        if x % args.save_every == 0:
             manager.save()
 
         # print("Training %d/%d complete" % (x, int(real_images.shape[0]/args.batch_size)) )
