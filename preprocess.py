@@ -6,7 +6,7 @@ from tensorflow.keras.preprocessing import image
 
 def crop(image, target_size):
     h, w = image.shape[-3], image.shape[-2]
-    cropped_image = tf.image.crop_to_bounding_box(image, int(0.1*h), int(0.1*w), int(0.8*h), int(0.9*w))
+    cropped_image = tf.image.crop_to_bounding_box(image, int(0.1*h), int(0.1*w), int(0.8*h), int(0.8*w))
     return tf.image.resize(cropped_image, target_size)
 
 def get_data(dir_path, target_size=(250,250), processed=False):

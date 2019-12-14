@@ -1,6 +1,6 @@
-/cars_train 
-/cars_test
 /output
 /__pycache__
 
 /.DS_Store
+/processed
+/lfw
