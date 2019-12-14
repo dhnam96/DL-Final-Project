@@ -318,7 +318,7 @@ def train_encoder(encoder, decoder, discriminator, real_images, mask):
 
 def test(decoder, channel):
     random_noise = np.random.normal(size=(args.batch_size, channel)).astype(np.float32)
-    img = decoder(random_noise).numpy()  
+    img = decoder(random_noise).numpy()
 
     ### Below, we've already provided code to save these generated images to files on disk
     # Rescale the image from (-1, 1) to (0, 255)
@@ -344,7 +344,7 @@ def test_completion(encoder, decoder, test_data, mask):
             img_i = img[i]
             s = args.out_dir+'/'+str(iteration)+'_'+str(i)+'.png'
             imwrite(s, img_i)
-                
+
             img_comb_i = img_comb[i]
             s_c = args.out_dir+'/'+str(iteration)+'_'+str(i)+'_comb.png'
             imwrite(s_c, img_comb_i)
@@ -429,7 +429,7 @@ def main():
                     print("**** SAVING CHECKPOINT AT END OF EPOCH ****")
                     manager.save()
             if args.mode == 'test':
-                test(generator, 512)
+                test(decoder, 512)
 
             if args.mode == 'train_completion':
                 loss_list = []
