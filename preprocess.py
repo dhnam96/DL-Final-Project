@@ -3,7 +3,7 @@ import tensorflow as tf
 import cv2, os, shutil, glob 
 from tensorflow.keras.preprocessing import image
 
-NUM_DATA = 8000
+NUM_DATA = 18000
 
 def crop_center(image, target_size):
     h, w = image.shape[-3], image.shape[-2]
