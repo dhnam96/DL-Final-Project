@@ -233,7 +233,7 @@ def train(decoder, discriminator, real_images, channel, manager):
         with tf.GradientTape() as dec_tape, tf.GradientTape() as disc_tape:
             pred_img = decoder.call(random_noise)
             disc_fake = discriminator.call(pred_img)
-            disc_real = discriminator.call(batch)
+            disc_real = discriminator.call(batch_real)
 
             dec_loss = decoder.loss_function(disc_fake)
             disc_loss = discriminator.loss_function(disc_real, disc_fake)
