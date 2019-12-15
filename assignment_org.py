@@ -1,190 +1,371 @@
+########################## Printing plot ##########################
+import matplotlib
+matplotlib.use('Agg')
+import tensorflow_gan as tfgan
+import tensorflow_hub as hub
+########################## Printing plot ##########################
 import os
 import sys
 import numpy as np
+import matplotlib.pyplot as plt
 import tensorflow as tf
-from keras.models import Sequential
-from keras.layers import Dense, Activation, LeakyReLU, BatchNormalization, Conv2d, Flatten, Reshape, Conv2DTranspose
-from keras.optimizers import Adam
-from preprocess import get_data
+import math
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Activation, LeakyReLU, BatchNormalization, Conv2D, Flatten, Reshape, Conv2DTranspose
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.losses import BinaryCrossentropy
+from preprocess_org import get_data
 from imageio import imwrite
 import argparse
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+matplotlib.use('Agg')
 
+gpu_available = tf.test.is_gpu_available()
+print("GPU Available: ", gpu_available)
 parser = argparse.ArgumentParser(description='GAN')
-parser.add_argument('--batch-size', type=int, default=128,
+parser.add_argument('--batch-size', type=int, default=256,
                     help='Sizes of image batches fed through the network')
 parser.add_argument('--out-dir', type=str, default='./output',
                     help='Data where sampled output images will be written')
-parser.add_argument('--img-width', type=int, default=256,
+parser.add_argument('--img-width', type=int, default=64,
                     help='Width of images in pixels')
-parser.add_argument('--img-height', type=int, default=256,
+parser.add_argument('--img-height', type=int, default=64,
                     help='Height of images in pixels')
+parser.add_argument('--num-epochs', type=int, default=10,
+                    help='Number of passes through the training data to make before stopping')
+parser.add_argument('--device', type=str, default='GPU:0' if gpu_available else 'CPU:0',
+                    help='specific the device of computation eg. CPU:0, GPU:0, GPU:1, GPU:2, ... ')
+parser.add_argument('--mode', type=str, default='train',
+                    help='Can be "train" or "test"')
+parser.add_argument('--save-every', type=int, default=500,
+                    help='Save the state of the network after every [this many] training iterations')
+parser.add_argument('--restore-checkpoint', action='store_true',
+                    help='Use this flag if you want to resuming training from a previously-saved checkpoint')
+parser.add_argument('--num-gen-updates', type=int, default=2,
+                    help='Number of generator updates per discriminator update')
 args = parser.parse_args()
 
-class Generator_Model(tf.keras.Model):
-    def __init__(self):
-        super(Generator_Model, self).__init__()
+def sample(m, logsigma):
+    eps = tf.random.normal(tf.shape(m), .0, 1.0)
+    return m + tf.math.exp(logsigma / 2) * eps
 
-        # Encoder Layers:
-        # self.conv1 = tf.keras.layers.Conv2d(filters = 5, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02))
-        # self.batch_norm1 = tf.keras.layers.BatchNormalization(epsilon = 1e-5)
-        # self.leaky1 = tf.keras.layers.LeakyReLU(alpha = 0.2)
-        # self.conv2 = tf.keras.layers.Conv2d(filters = 10, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02))
-        # self.batch_norm2 = tf.keras.layers.BatchNormalization(epsilon = 1e-5)
-        # self.leaky2 = tf.keras.layers.LeakyReLU(alpha = 0.2)
-        # self.conv3 = tf.keras.layers.Conv2d(filters = 20, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02))
-        # self.batch_norm3 = tf.keras.layers.BatchNormalization(epsilon = 1e-5)
-        # self.leaky3 = tf.keras.layers.LeakyReLU(alpha = 0.2)
-        # self.conv4 = tf.keras.layers.Conv2d(filters = 40, kernel_size = 32, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02))
-        # self.batch_norm4 = tf.keras.layers.BatchNormalization(epsilon = 1e-5)
-        # self.leaky4 = tf.keras.layers.LeakyReLU(alpha = 0.2)
-        # self.flatten = tf.keras.layers.Flatten()
-        # self.mean = tf.keras.layers.Dense(512)
-        # self.logsigma = tf.keras.layers.Dense(512, activation="tanh")
+def kullback_leibler_loss(m, logsigma):
+    return -tf.reduce_sum(logsigma - tf.math.pow(m, 2) - tf.math.exp(logsigma) + 1)/2
 
-        # Hyperparameters
-        self.filter_size = 32
-        self.kernel_size = 5
-        self.channel = 3
+def latent_layer_loss(feature_real, feature_tilde):
+    return tf.reduce_mean(tf.reduce_sum(-tf.square(feature_tilde - feature_real), [1,2,3])/2 + (-0.5 * tf.math.log(2*np.pi)))
+
+########################## Printing plot ##########################
+module = tf.keras.Sequential([hub.KerasLayer("https://tfhub.dev/google/tf2-preview/inception_v3/classification/4", output_shape=[1001])])
+def fid_function(real_image_batch, generated_image_batch):
+    """
+    Given a batch of real images and a batch of generated images, this function pulls down a pre-trained inception
+    v3 network and then uses it to extract the activations for both the real and generated images. The distance of
+    these activations is then computed. The distance is a measure of how "realistic" the generated images are.
+
+    :param real_image_batch: a batch of real images from the dataset, shape=[batch_size, height, width, channels]
+    :param generated_image_batch: a batch of images generated by the generator network, shape=[batch_size, height, width, channels]
+
+    :return: the inception distance between the real and generated images, scalar
+    """
+    INCEPTION_IMAGE_SIZE = (299, 299)
+    real_resized = tf.image.resize(real_image_batch, INCEPTION_IMAGE_SIZE)
+    fake_resized = tf.image.resize(generated_image_batch, INCEPTION_IMAGE_SIZE)
+    module.build([None, 299, 299, 3])
+    real_features = module(real_resized)
+    fake_features = module(fake_resized)
+    return tfgan.eval.frechet_classifier_distance_from_activations(real_features, fake_features)
+########################## Printing plot ##########################
+
+class Encoder(tf.keras.Model):
+    def __init__(self, filter_size, kernel_size, channel):
+        super(Encoder, self).__init__()
+
+        # Variables
+        self.filter_size = filter_size
+        self.kernel_size = kernel_size
+        self.channel = channel
+
+        # Hyperparameters:
         self.optimizer = Adam(lr = 2e-4, beta_1 = 0.5)
-        self.dense_out = 512
 
         # Sequential Encoder Layers
         self.encoder_model = Sequential()
-        self.encoder_model.add(Conv2d(filters = self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.encoder_model.add(Conv2D(filters = filter_size, kernel_size = kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.encoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.encoder_model.add(LeakyReLU(alpha = 0.2))
-        self.encoder_model.add(Conv2d(filters = 2*self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.encoder_model.add(Conv2D(filters = 2*filter_size, kernel_size = kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.encoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.encoder_model.add(LeakyReLU(alpha = 0.2))
-        self.encoder_model.add(Conv2d(filters = 4*self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.encoder_model.add(Conv2D(filters = 4*filter_size, kernel_size = kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.encoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.encoder_model.add(LeakyReLU(alpha = 0.2))
-        self.encoder_model.add(Conv2d(filters = 8*self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.encoder_model.add(Conv2D(filters = 8*filter_size, kernel_size = kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
         self.encoder_model.add(BatchNormalization(epsilon = 1e-5))
         self.encoder_model.add(LeakyReLU(alpha = 0.2))
         self.encoder_model.add(Flatten())
 
         # Intermediate Layers:
-        self.mean = tf.keras.layers.Dense(self.dense_out)
-        self.logsigma = tf.keras.layers.Dense(self.dense_out, activation="tanh")
+        self.mean = Dense(channel)
+        self.logsigma = Dense(channel, activation="tanh")
 
-        # Sequential Decoder Layers:
-        self.decoder_model = Sequential()
-        self.decoder_model.add(Dense(8*self.filter_size*args.img_width*args.img_height))
-        self.decoder_model.add(Reshape((args.img_width, args.img_height, 8*filter_size)))
-        self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
-        self.decoder_model.add(Activation('relu'))
-        self.decoder_model.add(Conv2DTranspose(filter = 4*self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
-        self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
-        self.decoder_model.add(Activation('relu'))
-        self.decoder_model.add(Conv2DTranspose(filter = 2*self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
-        self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
-        self.decoder_model.add(Activation('relu'))
-        self.decoder_model.add(Conv2DTranspose(filter = self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
-        self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
-        self.decoder_model.add(Activation('relu'))
-        self.decoder_model.add(Conv2DTranspose(filter = self.channel, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
-        self.decoder_model.add(Activation('tanh'))
-
-    def sample(m, logsigma):
-        eps = tf.random.normal(tf.shape(m), .0, 1.0)
-        return m + tf.math.exp(logsigma / 2) * eps
-
-    def kullback_leibler(self, m, logsigma):
-        return -tf.reduce_sum(logsigma - tf.math.pow(m, 2) - tf.math.exp(logsigma) + 1)/2
-
-    def encode(self, inputs):
+    @tf.function
+    def call(self, inputs):
         intermediate_output = self.encoder_model(inputs)
         mean = self.mean(intermediate_output)
         logsigma = self.logsigma(intermediate_output)
         encoder_output = sample(mean, logsigma)
         return mean, logsigma, encoder_output
 
-class Discriminator_Model(tf.keras.Model):
-    def __init__(self):
-        super(Discriminator_Model, self).__init__()
+    def loss_function(self, kl_loss, latent_loss):
+        return kl_loss/(self.channel*args.batch_size) - latent_loss/(4 * 4 * 512)
 
-        # Hyperparameters
-        self.filter_size = 64
-        self.kernel_size = 5
-        self.channel = 1
+class Decoder(tf.keras.Model):
+    def __init__(self, filter_size, kernel_size, channel):
+        super(Decoder, self).__init__()
+
+        # Variables
+        self.filter_size = filter_size
+        self.kernel_size = kernel_size
+        self.channel = channel
+
+        # Hyperparameters:
         self.optimizer = Adam(lr = 2e-4, beta_1 = 0.5)
 
-        # Layers
-        # self.conv1 = tf.keras.layers.Conv2d(filters = 5, kernel_size = self.kernel_size, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02), activation="relu")
-        # self.conv2 = tf.keras.layers.Conv2d(filters = 5, kernel_size = 4*self.kernel_size, strides=[1, 1], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02))
-        # self.conv3 = tf.keras.layers.Conv2d(filters = 5, kernel_size = 8*self.kernel_size, strides=[1, 1], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02))
-        # self.conv4 = tf.keras.layers.Conv2d(filters = 5, kernel_size = 8*self.kernel_size, strides=[1, 1], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02))
-        # self.conv5 = tf.keras.layers.Conv2d(filters = 5, kernel_size = 1, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02), activation="sigmoid")
+        # Sequential Decoder Layers:
+        self.decoder_model = Sequential()
+        self.decoder_model.add(Dense(8*self.filter_size*args.img_width*args.img_height/16/16))
+        self.decoder_model.add(Reshape((int(args.img_width/16), int(args.img_height/16), 8*self.filter_size)))
+        self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
+        self.decoder_model.add(Activation('relu'))
+        self.decoder_model.add(Conv2DTranspose(filters = 4*self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
+        self.decoder_model.add(Activation('relu'))
+        self.decoder_model.add(Conv2DTranspose(filters = 2*self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
+        self.decoder_model.add(Activation('relu'))
+        self.decoder_model.add(Conv2DTranspose(filters = self.filter_size, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.decoder_model.add(BatchNormalization(epsilon = 1e-5))
+        self.decoder_model.add(Activation('relu'))
+        self.decoder_model.add(Conv2DTranspose(filters = self.channel, kernel_size = self.kernel_size, strides = [2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.decoder_model.add(Activation('tanh'))
 
-        # Sequential Discriminator Model
+        self.fake_loss = BinaryCrossentropy()
+        self.tilde_loss = BinaryCrossentropy()
+
+    @tf.function
+    def call(self, inputs):
+        return self.decoder_model(inputs)
+
+    def loss_function(self, disc_fake_output, disc_tilde_output, latent_loss):
+        return self.fake_loss(tf.ones_like(disc_fake_output), disc_fake_output) + \
+            self.tilde_loss(tf.ones_like(disc_tilde_output), disc_tilde_output) - 1e-6 * latent_loss
+
+
+class Discriminator(tf.keras.Model):
+    def __init__(self, filter_size, kernel_size, channel):
+        super(Discriminator, self).__init__()
+
+        # Variables
+        self.filter_size = filter_size
+        self.kernel_size = kernel_size
+        self.channel = channel
+
+        # Hyperparameters:
+        self.optimizer = Adam(lr = 2e-4, beta_1 = 0.5)
+
+        # Feature
         self.discrim_model = Sequential()
-        self.discrim_model.add(Conv2d(filters = self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
-        self.discrim_model.add(Activation('relu'))
-        self.discrim_model.add(Conv2d(filters = 2*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
-        self.discrim_model.add(Conv2d(filters = 4*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
-        self.discrim_model.add(Conv2d(filters = 8*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
-        self.discrim_model.add(Conv2d(filters = self.channel, kernel_size = self.kernel_size, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
-        self.discrim_model.add(Activation('sigmoid'))
+        self.discrim_model.add(Conv2D(filters = 2*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.discrim_model.add(LeakyReLU(alpha = 0.2))
+        self.discrim_model.add(Conv2D(filters = 4*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.discrim_model.add(BatchNormalization(epsilon = 1e-5))
+        self.discrim_model.add(LeakyReLU(alpha = 0.2))
+        self.discrim_model.add(Conv2D(filters = 8*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="same", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
+        self.discrim_model.add(BatchNormalization(epsilon = 1e-5))
+        self.discrim_model.add(LeakyReLU(alpha = 0.2))
+        self.discrim_model.add(Conv2D(filters = 8*self.filter_size, kernel_size = self.kernel_size, strides=[2, 2], padding="valid", kernel_initializer = tf.random_normal_initializer(0, 0.02)))
 
-    def call(inputs):
-        """
-        This method does the forward pass for the discriminator model generation.
-        """
-        first_out = self.conv1(inputs)
-        second_out = self.conv2(first_out)
-        third_out = self.conv3(second_out)
-        fourth_out = self.conv4(third_out)
-        output = self.conv5(fourth_out)
-        return output
+        # Additional Layers to pass through after the sequential model
+        self.batch_norm = BatchNormalization(epsilon = 1e-5)
+        self.leaky_relu = LeakyReLU(alpha = 0.2)
+        self.flatten = Flatten()
+        self.dense = Dense(self.channel, activation = 'sigmoid')
 
-    def sequential_call(inputs):
-        output = self.discrim_model(inputs)
-        return output
+        # Define loss
+        self.real_loss = BinaryCrossentropy()
+        self.fake_loss = BinaryCrossentropy()
+        self.tilde_loss = BinaryCrossentropy()
 
-    def loss(discrim_real, discrim_fake):
-        self.bce = tf.keras.losses.BinaryCrossEntropy()
-        predict_fake = tf.reduce_mean(bce(y_true = tf.zeros_like(discrim_fake), y_pred=discrim_fake))
-        predict_real = tf.reduce_mean(bce(y_true = tf.ones_like(deiscrim_real), y_pred=discrim_real))
-        return tf.reduce_mean(-(tf.log(predict_real) + tf.log(1-predict_fake)))
+    @tf.function
+    def call(self, inputs):
+        middle_conv = self.discrim_model(inputs)
+        output = self.batch_norm(middle_conv)
+        output = self.leaky_relu(output)
+        output = self.flatten(output)
+        output = self.dense(output)
+        return middle_conv, output
 
-def train(generator, discriminator, train_data):
-    ### BATCH THIS
-    batched_train = train_data
-    ### DO PREPROCESS ON TRAIN LIKE SHUFFLE AND FLIP AND BATCH THEM
-    enc_mean, enc_logsigma, enc_Z = generator.encode(batched_train)
-    output = generator.decoder_model(enc_Z)
-    decoded_sample = generator.decoder_model(enc_mean + enc_logsigma)
-    discrim_fake = discriminator.discrim_model(output)
-    discrim_gen = discriminator.discrim_model(decoded_sample)
-    discrim_real = discriminator.discrim_model(batched_train)
+    def loss_function(self, disc_real_output, disc_fake_output, disc_tilde_output):
+        return self.real_loss(tf.ones_like(disc_real_output), disc_real_output) + \
+            self.fake_loss(tf.zeros_like(disc_fake_output), disc_fake_output) + \
+            self.tilde_loss(tf.zeros_like(disc_tilde_output), disc_tilde_output)
+
+def train(encoder, decoder, discriminator, real_images, cropped):
+
+    ########################## Printing plot ##########################
+    enc_loss_list = []
+    dec_loss_list = []
+    dis_loss_list = []
+    fid_list = []
+    ########################## Printing plot ##########################
+
+    # here images should be a numpy array
+    for x in range(0, int(real_images.shape[0]/args.batch_size)):
+        batch_real = real_images[x*args.batch_size: (x+1)*args.batch_size]
+        batch_cropped = cropped[x*args.batch_size: (x+1)*args.batch_size]
+
+        with tf.GradientTape() as enc_tape, tf.GradientTape() as dec_tape, tf.GradientTape() as disc_tape:
+            mean, logsigma, enc_out = encoder.call(batch_cropped)
+            zp = tf.random.truncated_normal(shape=enc_out.shape)
+            dec_out = decoder.call(enc_out)
+            dec_noise = decoder.call(zp)
+            feature_tilde, disc_tilde_out = discriminator.call(dec_out)
+            feature_real, disc_real_out = discriminator.call(batch_real)
+            feature_fake, disc_fake_out = discriminator.call(dec_noise)
+            kl_loss = kullback_leibler_loss(mean, logsigma)
+            ll_loss = latent_layer_loss(feature_real, feature_tilde)
+            enc_loss = encoder.loss_function(kl_loss, ll_loss)
+            print('Encoder Loss:')
+            print(enc_loss)
+            dec_loss = decoder.loss_function(disc_fake_out, disc_tilde_out, ll_loss)
+            print('Decoder Loss:')
+            print(dec_loss)
+            disc_loss = discriminator.loss_function(disc_real_out, disc_fake_out, disc_tilde_out)
+
+        enc_grads = enc_tape.gradient(enc_loss, encoder.trainable_variables)
+        dec_grads = dec_tape.gradient(dec_loss, decoder.trainable_variables)
+        disc_grads = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
+        encoder.optimizer.apply_gradients(zip(enc_grads, encoder.trainable_variables))
+        decoder.optimizer.apply_gradients(zip(dec_grads, decoder.trainable_variables))
+        discriminator.optimizer.apply_gradients(zip(disc_grads, discriminator.trainable_variables))
+
+        print("Training %d/%d complete" % (x, int(real_images.shape[0]/args.batch_size)) )
+        if x % 10 == 0 and x > 0:
+            print("Training %3.3f percent complete" % (100*x/(real_images.shape[0]/args.batch_size)))
+            print("Encoder Loss:")
+            print(enc_loss)
+            print("Decoder Loss:")
+            print(dec_loss)
+            print("Discriminator Loss:")
+            print(disc_loss)
+
+        ########################## Printing plot ##########################
+        fid_ = fid_function(batch_real, dec_out)
+        enc_loss_list.append(enc_loss.numpy())
+        dec_loss_list.append(dec_loss.numpy())
+        dis_loss_list.append(disc_loss.numpy())
+        fid_list.append(fid_.numpy())
+        ########################## Printing plot ##########################
+
+    return enc_loss_list, dec_loss_list, dis_loss_list, fid_list
 
 
-    pass
-
-def test():
-
-    pass
+def test(encoder, decoder, cropped):
+    for x in range(0, int(cropped.shape[0]/args.batch_size/4)):
+        batch_cropped = cropped[x*args.batch_size: (x+1)*args.batch_size]
+        mean, logsigma, enc_out = encoder.call(batch_cropped)
+        dec_out = decoder.call(enc_out)
+        generated = dec_out * 255
+        output = generated.numpy().astype(np.uint8)
+        for i in range(0, args.batch_size):
+            image = output[i]
+            s = args.out_dir + '/' + str(i) + '.png'
+            imwrite(s, image)
+        print("Training %d/%d complete" % (x, int(batch_cropped.shape[0]/args.batch_size)))
 
 def crop_img(images, x, y):
     images_copy = np.copy(images)
     images_copy[:, y:, x:, :] = 0.0
-    return images
+    return images_copy
 
+########################## Printing plot ##########################
+def plot(enc, dec, disc, fid, epoch):
+    x_axis = np.array(range(1, len(enc) + 1)) / len(enc) * (epoch + 1)
+    name = ['Encoder loss','Decoder loss','Discriminator loss','FID']
 
-def test(images):
-    for i in range(0, args.batch_size):
-        img_i = np.array(images[i]).astype(np.uint8)
-        s = args.out_dir+'/'+str(i)+'.jpg'
-        imwrite(s, img_i)
+    for l,n in zip([enc,dec,disc,fid], name):
+        print(x_axis)
+        print(l)
+        plt.figure()
+        plt.plot(x_axis, l, linewidth=3)
+        plt.xticks(np.arange(0,epoch + 1,1))
+        plt.ylabel('{}'.format(n))
+        plt.xlabel('Number of epochs')
+        plt.title('{}'.format(n))
+        plt.savefig('{}.png'.format(n))
+        plt.clf()
+########################## Printing plot ##########################
+
 
 def main():
-    train_data = get_data('./cars_train/preprocessed', resize=False)
-    #test_data = get_data('./cars_test/preprocessed', resize=False)
-    cropped = crop_img(np.array(train_data[:args.batch_size]), int(args.img_width/2), int(args.img_height/2))
+    # Get data
+    train_data = get_data('./cars_train', target_size=(args.img_width, args.img_height), resize=True)
+    test_data = get_data('./cars_test', target_size=(args.img_width, args.img_height), resize=True)
+    print('Train and test data retrieved')
+    cropped_train = crop_img(train_data, int(2*args.img_width/3), int(2*args.img_height/2))
+    cropped_test = crop_img(test_data, int(2*args.img_width/3), int(2*args.img_height/3))
+    print('Images are cropped')
 
-    test(cropped)
+    # Initialize model
+    encoder = Encoder(32, 5, 512)
+    decoder = Decoder(32, 5, 3)
+    discriminator = Discriminator(64, 5, 1)
+
+    # For saving/loading models
+    checkpoint_dir = './checkpoints'
+    checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
+    checkpoint = tf.train.Checkpoint(encoder=encoder, decoder=decoder, discriminator=discriminator)
+    manager = tf.train.CheckpointManager(checkpoint, checkpoint_dir, max_to_keep=3)
+
+    # Ensure the output directory exists
+    if not os.path.exists(args.out_dir):
+        os.makedirs(args.out_dir)
+
+    ########################## Printing plot ##########################
+    enc_loss_list = []
+    dec_loss_list = []
+    disc_loss_list = []
+    fid_list = []
+    ########################## Printing plot ##########################
+
+    if args.restore_checkpoint or args.mode == 'test':
+        # restores the latest checkpoint using from the manager
+        checkpoint.restore(manager.latest_checkpoint)
+
+    try:
+        # Specify an invalid GPU device
+        with tf.device('/device:' + args.device):
+            if args.mode == 'train':
+                for epoch in range(0, args.num_epochs):
+                    print('========================== EPOCH %d  ==========================' % epoch)
+                    ########################## Printing plot ##########################
+                    enc_loss, dec_loss, disc_loss, fid = train(encoder, decoder, discriminator, train_data, cropped_train)
+                    enc_loss_list += enc_loss
+                    dec_loss_list += dec_loss
+                    disc_loss_list += disc_loss
+                    fid_list += fid
+                    plot(enc_loss_list, dec_loss_list, disc_loss_list, fid_list, epoch)
+                    ########################## Printing plot ##########################
+                    # print("Average FID for Epoch: " + str(avg_fid))
+                    # Save at the end of the epoch, too
+                    print("**** SAVING CHECKPOINT AT END OF EPOCH ****")
+                    manager.save()
+            if args.mode == 'test':
+                test(encoder, decoder, cropped_test)
+    except RuntimeError as e:
+        print(e)
+
 if __name__ == '__main__':
    main()
