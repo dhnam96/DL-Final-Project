@@ -6,7 +6,7 @@ from tensorflow.keras.preprocessing import image
 
 def crop(image, target_size):
     h, w = image.shape[-3], image.shape[-2]
-    cropped_image = tf.image.crop_to_bounding_box(image, int(0.20*h), int(0.20*w), int(0.6*h), int(0.6*w))
+    cropped_image = tf.image.crop_to_bounding_box(image, int(0.2*h), int(0.2*w), int(0.6*h), int(0.6*w))
     return tf.image.resize(cropped_image, target_size)
 
 def get_data(dir_path, target_size=(250,250), processed=False):
@@ -41,9 +41,3 @@ def get_data(dir_path, target_size=(250,250), processed=False):
             print("Preprocessing %3.2f percent completed" %(index/num_img*100))
     print("Preprocessing 100 percent completed")
     return data
-
-def main():
-    get_data('./lfw', target_size=(64,64))
-
-if __name__ == '__main__':
-   main()
