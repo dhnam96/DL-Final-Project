@@ -14,7 +14,7 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Activation, LeakyReLU, BatchNormalization, Conv2D, Flatten, Reshape, Conv2DTranspose
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.losses import BinaryCrossentropy
-from preprocess import get_data
+from preprocess_org import get_data
 from imageio import imwrite
 import argparse
 
@@ -60,8 +60,8 @@ def latent_layer_loss(feature_real, feature_tilde):
 module = tf.keras.Sequential([hub.KerasLayer("https://tfhub.dev/google/tf2-preview/inception_v3/classification/4", output_shape=[1001])])
 def fid_function(real_image_batch, generated_image_batch):
     """
-    Given a batch of real images and a batch of generated images, this function pulls down a pre-trained inception 
-    v3 network and then uses it to extract the activations for both the real and generated images. The distance of 
+    Given a batch of real images and a batch of generated images, this function pulls down a pre-trained inception
+    v3 network and then uses it to extract the activations for both the real and generated images. The distance of
     these activations is then computed. The distance is a measure of how "realistic" the generated images are.
 
     :param real_image_batch: a batch of real images from the dataset, shape=[batch_size, height, width, channels]
@@ -243,7 +243,7 @@ def train(encoder, decoder, discriminator, real_images, cropped):
             print('Decoder Loss:')
             print(dec_loss)
             disc_loss = discriminator.loss_function(disc_real_out, disc_fake_out, disc_tilde_out)
-        
+
         enc_grads = enc_tape.gradient(enc_loss, encoder.trainable_variables)
         dec_grads = dec_tape.gradient(dec_loss, decoder.trainable_variables)
         disc_grads = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
@@ -268,7 +268,7 @@ def train(encoder, decoder, discriminator, real_images, cropped):
         dis_loss_list.append(disc_loss.numpy())
         fid_list.append(fid_.numpy())
         ########################## Printing plot ##########################
-    
+
     return enc_loss_list, dec_loss_list, dis_loss_list, fid_list
 
 
@@ -295,7 +295,7 @@ def plot(enc, dec, disc, fid, epoch):
     x_axis = np.array(range(1, len(enc) + 1)) / len(enc) * (epoch + 1)
     name = ['Encoder loss','Decoder loss','Discriminator loss','FID']
 
-    for l,n in zip([enc,dec,disc,fid], name):   
+    for l,n in zip([enc,dec,disc,fid], name):
         print(x_axis)
         print(l)
         plt.figure()
@@ -306,13 +306,13 @@ def plot(enc, dec, disc, fid, epoch):
         plt.title('{}'.format(n))
         plt.savefig('{}.png'.format(n))
         plt.clf()
-########################## Printing plot ########################## 
+########################## Printing plot ##########################
 
 
 def main():
     # Get data
-    train_data = get_data('./cars_train/preprocessed', target_size=(args.img_width, args.img_height), resize=False)
-    test_data = get_data('./cars_test/preprocessed', target_size=(args.img_width, args.img_height), resize=False)
+    train_data = get_data('./cars_train', target_size=(args.img_width, args.img_height), resize=True)
+    test_data = get_data('./cars_test', target_size=(args.img_width, args.img_height), resize=True)
     print('Train and test data retrieved')
     cropped_train = crop_img(train_data, int(2*args.img_width/3), int(2*args.img_height/2))
     cropped_test = crop_img(test_data, int(2*args.img_width/3), int(2*args.img_height/3))

@@ -408,7 +408,7 @@ def main():
     fid_list = []
     ########################## Printing plot ##########################
 
-    if args.restore_checkpoint or args.mode == 'test' or args.mode == 'train_completion' or args.mode == 'train_test':
+    if args.restore_checkpoint or args.mode == 'test' or args.mode == 'train_completion' or args.mode == 'test_completion':
         # restores the latest checkpoint using from the manager
         checkpoint.restore(manager.latest_checkpoint)
 
