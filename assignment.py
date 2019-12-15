@@ -229,6 +229,7 @@ def train(decoder, discriminator, real_images, channel, manager):
     # here images should be a numpy array
     for x in range(0, int(real_images.shape[0]/args.batch_size)):
         batch_real = real_images[x*args.batch_size: (x+1)*args.batch_size]
+        batch_real = tf.image.random_flip_left_right(batch_real)
         random_noise = np.random.uniform(-1, 1, size=(args.batch_size, channel)).astype(np.float32)
 
         with tf.GradientTape() as dec_tape, tf.GradientTape() as disc_tape:
