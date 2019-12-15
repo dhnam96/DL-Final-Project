@@ -8,7 +8,9 @@ Approach 2: preprocess.py, assignment.py
 Here, we specify how to run the second approach but the first approach should be in the repository for reference
 
 1) clone this repository 
-2) download the celebA dataset from ```/course/cs1470/asgn/dcgan/celebA.tar.gz``` (make sure that there is a celebA directory within the repository)
+2) download the celebA dataset from ```/course/cs1470/asgn/dcgan/celebA.tar.gz``` 
+
+(make sure that there is a celebA directory within the repository)
 3) extract the celebA dataset 
 
 To run the code, make sure you're in the CS147 virtual environment:
