@@ -23,6 +23,8 @@ print("GPU Available: ", gpu_available)
 parser = argparse.ArgumentParser(description='GAN')
 parser.add_argument('--batch-size', type=int, default=256,
                     help='Sizes of image batches fed through the network')
+parser.add_argument('--img-dir', type=str, default='./data/celebA',
+                    help='Data where training images live')
 parser.add_argument('--out-dir', type=str, default='./output',
                     help='Data where sampled output images will be written')
 parser.add_argument('--img-width', type=int, default=64,
@@ -378,7 +380,7 @@ def plot(l, n, epoch):
 
 def main():
     # Get data
-    image_data = get_data('./lfw', target_size=(args.img_width, args.img_height), processed=True)
+    image_data = get_data(args.img_dir, target_size=(args.img_width, args.img_height), processed=True)
     partition = int(len(image_data) * 0.8)
     train_data = np.copy(image_data[:partition])
     test_data = np.copy(image_data[partition:])
