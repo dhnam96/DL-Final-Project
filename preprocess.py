@@ -17,7 +17,7 @@ def crop_center(image, target_size):
     # return tf.image.resize(cropped_image, target_size)
 
 def get_data(dir_path, target_size=(250,250), processed=False):
-    
+
     if not processed:
         processed_dir = os.path.join(os.path.dirname(dir_path), 'processed')
     else:
